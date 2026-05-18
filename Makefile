@@ -27,7 +27,7 @@ build:
 	go build -o $(BINARY) $(CMD)
 
 run: build
-	./$(BINARY) serve
+	DB_PATH=./schedule-containers.db ./$(BINARY) serve
 
 test:
 	go test ./internal/... -count=1
