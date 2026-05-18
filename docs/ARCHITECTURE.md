@@ -5,9 +5,9 @@ If you want to familiarize yourself with the codebase, you are in the right plac
 
 ## Bird's Eye View
 
-Schedule Containers is a single Go binary that keeps Docker containers running on a schedule. You define cron expressions for when a container should start and stop, and the scheduler ensures those actions happen at the right time. It also provides a web dashboard and REST API for managing schedules and manually controlling containers.
+Schedule Containers is a single Go binary that keeps Docker containers running on a schedule. You define cron expressions for when a container should start and stop, and the scheduler ensures those actions happen at the right time. Tags allow you to define a schedule template (start/stop cron) and apply it to multiple containers at once. It also provides a web dashboard and REST API for managing schedules, tags, and manually controlling containers.
 
-The runtime flow is straightforward: on startup, the `serve` command loads persisted schedules from SQLite, registers them with an in-process cron runner, and starts an HTTP server. When a cron job fires, the scheduler calls the Docker API to start or stop the target container. The web dashboard and REST API let you create, toggle, and delete schedules which dynamically add or remove cron jobs. Portainer stack names are detected from Docker labels on containers.
+The runtime flow is straightforward: on startup, the `serve` command loads persisted schedules and tags from SQLite, registers them with an in-process cron runner, and starts an HTTP server. When a cron job fires, the scheduler calls the Docker API to start or stop the target container. The web dashboard and REST API let you create, toggle, and delete schedules and tags which dynamically add or remove cron jobs.
 
 ```
                     ┌─────────────────────┐
@@ -50,17 +50,17 @@ Entry point. Minimal `main.go` that delegates to `internal/cli`. Nothing interes
 
 ### `internal/cli/`
 
-CLI commands backed by Cobra. `serve.go` is the most important file — it wires together the store, Docker client, scheduler, and web server. `schedule.go` and `containers.go` are thin wrappers over the store and Docker client for offline operations.
+CLI commands backed by Cobra. `serve.go` is the most important file — it wires together the store, Docker client, scheduler, and web server. `schedule.go` and `tag.go` are thin wrappers over the store for offline operations.
 
-Key files: `serve.go`, `schedule.go`
+Key files: `serve.go`, `schedule.go`, `tag.go`
 
 **Architecture Invariant:** CLI commands outside `serve` only touch the store directly — they do not interact with the scheduler. Schedules added via CLI become active on next `serve` restart.
 
 ### `internal/models/`
 
-Pure data types: `Schedule`, `Container`, and `CronPreset`. No logic, no dependencies. Every other package imports this one.
+Pure data types: `Schedule`, `Container`, `CronPreset`, and `Tag`. No logic, no dependencies. Every other package imports this one.
 
-Key files: `schedule.go`, `container.go`, `preset.go`
+Key files: `schedule.go`, `container.go`, `preset.go`, `tag.go`
 
 ### `internal/config/`
 
@@ -70,7 +70,7 @@ Key files: `config.go`
 
 ### `internal/store/`
 
-SQLite persistence for schedules. Uses `modernc.org/sqlite` (pure Go, no CGO). The `Open` function runs schema migrations on startup, including a `schema_version` table for future migrations. CRUD operations are straightforward — create, get, list, update, delete, toggle for schedules.
+SQLite persistence for schedules and tags. Uses `modernc.org/sqlite` (pure Go, no CGO). The `Open` function runs schema migrations on startup with a `schema_version` table for versioned migrations. CRUD operations cover schedules (create, get, list, update, delete, toggle) and tags (create, get, list, update, delete). `DeleteTag` cascades to delete all schedules with the matching `tag_id`. A unique index on `(tag_id, container_name)` prevents duplicate schedules for the same tag+container.
 
 Key files: `store.go`
 
@@ -84,7 +84,7 @@ Key files: `presets.go`, `presets.yaml`
 
 ### `internal/yamlconfig/`
 
-YAML import/export for schedules. `FromSchedules` serializes schedules to YAML bytes. `ToSchedules` parses and validates YAML into schedule models (validates cron expressions via `scheduler.ValidateCronExpression`). `ImportFromFile` reads a file and delegates to `ToSchedules`.
+YAML import/export for schedules and tags. `FromSchedulesAndTags` serializes schedules and tags to YAML bytes, grouping tag-derived schedules under their tag. `ToSchedulesAndTags` parses YAML into schedule and tag models. `FromSchedules` is a convenience wrapper for schedules-only export.
 
 Key files: `config.go`
 
@@ -108,7 +108,7 @@ Key files: `scheduler.go`
 
 HTTP server, REST API handlers, and Go templates with HTMX. Chi router for routing, `embed.FS` for templates and static assets baked into the binary. The `SchedulerService` interface decouples the web layer from the concrete `scheduler.Scheduler` type.
 
-API routes include schedule CRUD, container start/stop, cron presets (list, create, delete), and YAML import/export. HTML pages include a dashboard, containers view, schedule creation form (with preset dropdowns), and a presets management page.
+API routes include schedule CRUD, container start/stop, cron presets (list, create, delete), tag CRUD with container management and toggle, and YAML import/export. HTML pages include a dashboard, containers view, schedule creation form (with preset dropdowns), presets management page, and tags page.
 
 Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go` (HTML rendering), `templates/`, `static/`
 
@@ -117,7 +117,8 @@ Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go
 ## Invariants
 
 - **Dependency direction:** `models` ← `config` ← `store`/`cronpresets` ← `docker` ← `scheduler` ← `yamlconfig` ← `web`/`cli`. No cycles. `store` and `cronpresets` are leaves; they never import from scheduler, web, or docker.
-- **Presets are file-based, not DB-based:** All presets (built-in and custom) live in a YAML file managed by `cronpresets.Service`. No `custom_presets` database table. Create/delete writes directly to the YAML file with mutex protection.
+- **Tags are linked to schedules via `tag_id`:** A nullable `tag_id` column on the `schedules` table links each schedule to its tag. Tag-derived schedules cannot have their cron expressions edited independently — update the tag instead. Deleting a tag cascades to all its schedules.
+- **Tags are persisted in SQLite** — like schedules. Not in YAML (presets are in YAML, tags are user data in the DB).
 - **Store is offline-only for CLI:** The `schedule add` CLI command writes to SQLite directly. The running server reads schedules from SQLite on startup. Changes made while the server is running (via API) immediately update the cron runner. CLI-only changes take effect on next server restart.
 - **Per-container serialization:** The scheduler holds a map of `sync.Mutex` per container name. Two cron jobs targeting the same container will never run concurrently — they wait for the mutex.
 - **Cron format:** Always 5-field standard (`min hour day month weekday`), not 6-field with seconds. `ValidateCronExpression` uses `cron.ParseStandard`.

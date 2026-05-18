@@ -26,10 +26,11 @@ docker compose up -d
 ## Features
 
 - **Cron scheduling** — Start and stop containers on any cron expression (`0 8 * * 1-5` = weekdays at 8am)
+- **Tags** — Define schedule templates with start/stop cron, apply to multiple containers at once
 - **Cron preset selectors** — Default presets from embedded YAML, plus create/delete custom presets via API or web UI
-- **YAML import/export** — Export schedules as YAML, import from file or API
+- **YAML import/export** — Export schedules and tags as YAML, import from file or API
 - **Web dashboard** — Go templates + HTMX, single binary, no JS build step
-- **REST API** — Full CRUD for schedules, presets, import/export, container start/stop
+- **REST API** — Full CRUD for schedules, tags, presets, import/export, container start/stop
 - **CLI** — `schedule-containers schedule add my-app "0 8 * * *" "0 18 * * *"`
 - **Portainer-aware** — Detects compose stacks from `com.docker.compose.project` labels
 - **Per-container locking** — Prevents race conditions when concurrent cron jobs target the same container
@@ -74,6 +75,14 @@ schedule-containers schedule list
 # Remove a schedule
 schedule-containers schedule remove <id>
 
+# Tags - reusable schedule templates
+schedule-containers tag add business-hours --start "0 8 * * 1-5" --stop "0 18 * * 1-5"
+schedule-containers tag list
+schedule-containers tag apply business-hours --containers my-app,redis
+schedule-containers tag remove-container business-hours --container my-app
+schedule-containers tag toggle business-hours
+schedule-containers tag remove business-hours
+
 # Export schedules to YAML
 schedule-containers schedule export schedules.yaml
 
@@ -103,8 +112,20 @@ curl -X POST http://localhost:8080/api/presets \
   -H "Content-Type: application/json" \
   -d '{"label":"Late start","expression":"0 10 * * 1-5","category":"Custom"}'
 
-# Export schedules as YAML
-curl http://localhost:8080/api/export -o schedules.yaml
+# Create a tag and apply to containers
+curl -X POST http://localhost:8080/api/tags \
+  -H "Content-Type: application/json" \
+  -d '{"name":"business-hours","start_cron":"0 8 * * 1-5","stop_cron":"0 18 * * 1-5","enabled":true}'
+
+curl -X POST http://localhost:8080/api/tags/<id>/containers \
+  -H "Content-Type: application/json" \
+  -d '{"containers":["my-app","redis"]}'
+
+# Toggle a tag on/off (toggles all its schedules too)
+curl -X POST http://localhost:8080/api/tags/<id>/toggle
+
+# Export schedules and tags as YAML
+curl http://localhost:8080/api/export -o config.yaml
 
 # Import schedules from YAML
 curl -X POST http://localhost:8080/api/import \
@@ -114,7 +135,7 @@ curl -X POST http://localhost:8080/api/import \
 
 ### Dashboard
 
-Open `http://localhost:8080` for the web interface — view containers, manage schedules, start/stop containers with one click. Use the preset dropdowns to quickly set cron expressions, manage custom presets at `/presets`, and export/import schedules as YAML.
+Open `http://localhost:8080` for the web interface — view containers, manage schedules, start/stop containers with one click. Use the preset dropdowns to quickly set cron expressions, manage custom presets at `/presets`, create and apply tags at `/tags`, and export/import schedules as YAML.
 
 For all options: `schedule-containers --help`
 
@@ -137,8 +158,9 @@ For all options: `schedule-containers --help`
 
 ## Documentation
 
-- [Architecture & design spec](docs/superpowers/specs/2025-05-13-schedule-containers-design.md)
-- [Implementation plan](docs/superpowers/plans/2025-05-13-schedule-containers.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Tags feature design](docs/superpowers/specs/2026-05-18-tags-design.md)
+- [Original design spec](docs/superpowers/specs/2025-05-13-schedule-containers-design.md)
 
 ## License
 
