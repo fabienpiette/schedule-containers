@@ -48,7 +48,7 @@ install:
 	go mod tidy
 
 docker-build:
-	docker build -t $(DOCKER_IMAGE) .
+	docker build --no-cache -t $(DOCKER_IMAGE) .
 
 docker-up:
 	docker compose up -d
