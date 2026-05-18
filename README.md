@@ -26,8 +26,10 @@ docker compose up -d
 ## Features
 
 - **Cron scheduling** — Start and stop containers on any cron expression (`0 8 * * 1-5` = weekdays at 8am)
+- **Cron preset selectors** — Built-in presets (daily, weekdays, weekends, etc.) plus custom presets via API
+- **YAML import/export** — Export schedules as YAML, import from file or API
 - **Web dashboard** — Go templates + HTMX, single binary, no JS build step
-- **REST API** — Full CRUD for schedules, container start/stop endpoints
+- **REST API** — Full CRUD for schedules, presets, import/export, container start/stop
 - **CLI** — `schedule-containers schedule add my-app "0 8 * * *" "0 18 * * *"`
 - **Portainer-aware** — Detects compose stacks from `com.docker.compose.project` labels
 - **Per-container locking** — Prevents race conditions when concurrent cron jobs target the same container
@@ -71,6 +73,12 @@ schedule-containers schedule list
 
 # Remove a schedule
 schedule-containers schedule remove <id>
+
+# Export schedules to YAML
+schedule-containers schedule export schedules.yaml
+
+# Import schedules from YAML (dry-run)
+schedule-containers schedule import schedules.yaml --dry-run
 ```
 
 ### API
@@ -86,11 +94,27 @@ curl -X POST http://localhost:8080/api/containers/my-app/start
 
 # Toggle a schedule on/off
 curl -X POST http://localhost:8080/api/schedules/<id>/toggle
+
+# List cron presets (built-in + custom)
+curl http://localhost:8080/api/presets
+
+# Create a custom preset
+curl -X POST http://localhost:8080/api/presets \
+  -H "Content-Type: application/json" \
+  -d '{"label":"Late start","expression":"0 10 * * 1-5","category":"Custom"}'
+
+# Export schedules as YAML
+curl http://localhost:8080/api/export -o schedules.yaml
+
+# Import schedules from YAML
+curl -X POST http://localhost:8080/api/import \
+  -H "Content-Type: application/yaml" \
+  --data-binary @schedules.yaml
 ```
 
 ### Dashboard
 
-Open `http://localhost:8080` for the web interface — view containers, manage schedules, start/stop containers with one click.
+Open `http://localhost:8080` for the web interface — view containers, manage schedules, start/stop containers with one click. Use the preset dropdowns to quickly set cron expressions, and export/import schedules as YAML.
 
 For all options: `schedule-containers --help`
 
