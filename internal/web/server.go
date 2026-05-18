@@ -71,6 +71,11 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		r.Post("/schedules/{id}/toggle", srv.apiToggleSchedule)
 		r.Post("/containers/{name}/start", srv.apiStartContainer)
 		r.Post("/containers/{name}/stop", srv.apiStopContainer)
+		r.Get("/presets", srv.apiListPresets)
+		r.Post("/presets", srv.apiCreateCustomPreset)
+		r.Delete("/presets/{id}", srv.apiDeleteCustomPreset)
+		r.Post("/import", srv.apiImportSchedules)
+		r.Get("/export", srv.apiExportSchedules)
 	})
 
 	addr := fmt.Sprintf("%s:%d", cfg.WebHost, cfg.WebPort)

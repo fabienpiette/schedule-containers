@@ -2,13 +2,17 @@ package web
 
 import (
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/gndm/schedule-containers/internal/cronpresets"
 	"github.com/gndm/schedule-containers/internal/models"
 	"github.com/gndm/schedule-containers/internal/scheduler"
+	"github.com/gndm/schedule-containers/internal/yamlconfig"
 )
 
 func (s *Server) apiListContainers(w http.ResponseWriter, r *http.Request) {
@@ -161,4 +165,111 @@ func (s *Server) apiStopContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) apiListPresets(w http.ResponseWriter, r *http.Request) {
+	builtins := cronpresets.Builtins()
+	custom, err := s.store.ListCustomPresets()
+	if err != nil {
+		slog.Error("failed to list custom presets", "error", err)
+		custom = nil
+	}
+
+	all := make([]models.CronPreset, len(builtins)+len(custom))
+	copy(all, builtins)
+	copy(all[len(builtins):], custom)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(all)
+}
+
+func (s *Server) apiCreateCustomPreset(w http.ResponseWriter, r *http.Request) {
+	var req models.CronPreset
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	req.Label = strings.TrimSpace(req.Label)
+	req.Expression = strings.TrimSpace(req.Expression)
+	req.ID = ""
+
+	if req.Label == "" {
+		http.Error(w, "label is required", http.StatusBadRequest)
+		return
+	}
+	if req.Expression == "" {
+		http.Error(w, "expression is required", http.StatusBadRequest)
+		return
+	}
+	if err := scheduler.ValidateCronExpression(req.Expression); err != nil {
+		http.Error(w, "invalid cron expression: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Category == "" {
+		req.Category = "Custom"
+	}
+
+	created, err := s.store.CreateCustomPreset(&req)
+	if err != nil {
+		slog.Error("failed to create custom preset", "error", err)
+		http.Error(w, "failed to create preset", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(created)
+}
+
+func (s *Server) apiDeleteCustomPreset(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := s.store.DeleteCustomPreset(id); err != nil {
+		http.Error(w, "preset not found", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) apiImportSchedules(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	schedules, err := yamlconfig.ToSchedules(body)
+	if err != nil {
+		http.Error(w, "failed to parse YAML: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	created := 0
+	for _, sched := range schedules {
+		if _, err := s.store.CreateSchedule(&sched); err != nil {
+			slog.Error("failed to import schedule", "container", sched.ContainerName, "error", err)
+			continue
+		}
+		if sched.Enabled {
+			if err := s.scheduler.AddSchedule(&sched); err != nil {
+				slog.Warn("failed to add imported schedule to cron runner", "error", err)
+			}
+		}
+		created++
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"imported": created, "total": len(schedules)})
+}
+
+func (s *Server) apiExportSchedules(w http.ResponseWriter, r *http.Request) {
+	schedules, err := s.store.ListSchedules()
+	if err != nil {
+		slog.Error("failed to list schedules", "error", err)
+		http.Error(w, "failed to list schedules", http.StatusInternalServerError)
+		return
+	}
+
+	data := yamlconfig.FromSchedules(schedules)
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Write(data)
 }
