@@ -13,6 +13,7 @@ type Schedule struct {
 	OnDemandEnabled bool      `json:"on_demand_enabled"`
 	OnDemandURL     string    `json:"on_demand_url"`
 	IdleTimeoutSec  int       `json:"idle_timeout_sec"`
+	TagID           *string   `json:"tag_id,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
