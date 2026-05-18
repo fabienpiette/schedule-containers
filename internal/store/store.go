@@ -35,8 +35,6 @@ func (s *Store) migrate() error {
 		CREATE TABLE IF NOT EXISTS schema_version (
 			version INTEGER PRIMARY KEY
 		);
-		INSERT OR IGNORE INTO schema_version (version) VALUES (1);
-
 		CREATE TABLE IF NOT EXISTS schedules (
 			id TEXT PRIMARY KEY,
 			container_name TEXT NOT NULL,
@@ -51,8 +49,48 @@ func (s *Store) migrate() error {
 			created_at TIMESTAMP NOT NULL,
 			updated_at TIMESTAMP NOT NULL
 		)`)
-	return err
+	if err != nil {
+		return err
+	}
+
+	var version int
+	row := s.db.QueryRow("SELECT MAX(version) FROM schema_version")
+	if row.Scan(&version) != nil {
+		version = 0
+	}
+	if version < 1 {
+		_, err = s.db.Exec("INSERT OR IGNORE INTO schema_version (version) VALUES (1)")
+		if err != nil {
+			return err
+		}
+		version = 1
+	}
+
+	if version < 2 {
+		_, err = s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS tags (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL UNIQUE,
+				start_cron TEXT NOT NULL,
+				stop_cron TEXT NOT NULL,
+				enabled BOOLEAN NOT NULL DEFAULT TRUE,
+				created_at TIMESTAMP NOT NULL,
+				updated_at TIMESTAMP NOT NULL
+			);
+			ALTER TABLE schedules ADD COLUMN tag_id TEXT;
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_schedules_tag_container ON schedules(tag_id, container_name) WHERE tag_id IS NOT NULL;
+			UPDATE schema_version SET version = 2 WHERE version = 1;
+			INSERT OR IGNORE INTO schema_version (version) VALUES (2);
+		`)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
+
+// --- Schedule CRUD ---
 
 func (s *Store) CreateSchedule(schedule *models.Schedule) (*models.Schedule, error) {
 	now := time.Now().UTC()
@@ -61,12 +99,12 @@ func (s *Store) CreateSchedule(schedule *models.Schedule) (*models.Schedule, err
 	schedule.UpdatedAt = now
 
 	_, err := s.db.Exec(`
-		INSERT INTO schedules (id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO schedules (id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		schedule.ID, schedule.ContainerName, schedule.DisplayName, schedule.StackName,
 		schedule.StartCron, schedule.StopCron, schedule.Enabled,
 		schedule.OnDemandEnabled, schedule.OnDemandURL, schedule.IdleTimeoutSec,
-		schedule.CreatedAt, schedule.UpdatedAt,
+		schedule.TagID, schedule.CreatedAt, schedule.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -76,14 +114,14 @@ func (s *Store) CreateSchedule(schedule *models.Schedule) (*models.Schedule, err
 
 func (s *Store) GetSchedule(id string) (*models.Schedule, error) {
 	row := s.db.QueryRow(`
-		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, created_at, updated_at
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
 		FROM schedules WHERE id = ?`, id)
 	return scanSchedule(row)
 }
 
 func (s *Store) ListSchedules() ([]models.Schedule, error) {
 	rows, err := s.db.Query(`
-		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, created_at, updated_at
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
 		FROM schedules ORDER BY created_at`)
 	if err != nil {
 		return nil, err
@@ -92,13 +130,11 @@ func (s *Store) ListSchedules() ([]models.Schedule, error) {
 
 	var schedules []models.Schedule
 	for rows.Next() {
-		var sched models.Schedule
-		if err := rows.Scan(&sched.ID, &sched.ContainerName, &sched.DisplayName, &sched.StackName,
-			&sched.StartCron, &sched.StopCron, &sched.Enabled, &sched.OnDemandEnabled,
-			&sched.OnDemandURL, &sched.IdleTimeoutSec, &sched.CreatedAt, &sched.UpdatedAt); err != nil {
+		sched, err := scanScheduleFromRows(rows)
+		if err != nil {
 			return nil, err
 		}
-		schedules = append(schedules, sched)
+		schedules = append(schedules, *sched)
 	}
 	return schedules, rows.Err()
 }
@@ -106,12 +142,12 @@ func (s *Store) ListSchedules() ([]models.Schedule, error) {
 func (s *Store) UpdateSchedule(schedule *models.Schedule) (*models.Schedule, error) {
 	schedule.UpdatedAt = time.Now().UTC()
 	_, err := s.db.Exec(`
-		UPDATE schedules SET container_name=?, display_name=?, stack_name=?, start_cron=?, stop_cron=?, enabled=?, on_demand_enabled=?, on_demand_url=?, idle_timeout_sec=?, updated_at=?
+		UPDATE schedules SET container_name=?, display_name=?, stack_name=?, start_cron=?, stop_cron=?, enabled=?, on_demand_enabled=?, on_demand_url=?, idle_timeout_sec=?, tag_id=?, updated_at=?
 		WHERE id=?`,
 		schedule.ContainerName, schedule.DisplayName, schedule.StackName,
 		schedule.StartCron, schedule.StopCron, schedule.Enabled,
 		schedule.OnDemandEnabled, schedule.OnDemandURL, schedule.IdleTimeoutSec,
-		schedule.UpdatedAt, schedule.ID,
+		schedule.TagID, schedule.UpdatedAt, schedule.ID,
 	)
 	if err != nil {
 		return nil, err
@@ -133,13 +169,153 @@ func (s *Store) ToggleSchedule(id string) (*models.Schedule, error) {
 	return s.UpdateSchedule(sched)
 }
 
-func scanSchedule(row *sql.Row) (*models.Schedule, error) {
-	var sched models.Schedule
-	err := row.Scan(&sched.ID, &sched.ContainerName, &sched.DisplayName, &sched.StackName,
-		&sched.StartCron, &sched.StopCron, &sched.Enabled, &sched.OnDemandEnabled,
-		&sched.OnDemandURL, &sched.IdleTimeoutSec, &sched.CreatedAt, &sched.UpdatedAt)
+func (s *Store) ListSchedulesByTag(tagID string) ([]models.Schedule, error) {
+	rows, err := s.db.Query(`
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
+		FROM schedules WHERE tag_id = ? ORDER BY created_at`, tagID)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
+	var schedules []models.Schedule
+	for rows.Next() {
+		sched, err := scanScheduleFromRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		schedules = append(schedules, *sched)
+	}
+	return schedules, rows.Err()
+}
+
+func (s *Store) GetScheduleByTagAndContainer(tagID, containerName string) (*models.Schedule, error) {
+	row := s.db.QueryRow(`
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
+		FROM schedules WHERE tag_id = ? AND container_name = ?`, tagID, containerName)
+	return scanSchedule(row)
+}
+
+func scanSchedule(row *sql.Row) (*models.Schedule, error) {
+	var sched models.Schedule
+	var tagID sql.NullString
+	err := row.Scan(&sched.ID, &sched.ContainerName, &sched.DisplayName, &sched.StackName,
+		&sched.StartCron, &sched.StopCron, &sched.Enabled, &sched.OnDemandEnabled,
+		&sched.OnDemandURL, &sched.IdleTimeoutSec, &tagID, &sched.CreatedAt, &sched.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if tagID.Valid {
+		sched.TagID = &tagID.String
+	}
 	return &sched, nil
+}
+
+func scanScheduleFromRows(rows *sql.Rows) (*models.Schedule, error) {
+	var sched models.Schedule
+	var tagID sql.NullString
+	err := rows.Scan(&sched.ID, &sched.ContainerName, &sched.DisplayName, &sched.StackName,
+		&sched.StartCron, &sched.StopCron, &sched.Enabled, &sched.OnDemandEnabled,
+		&sched.OnDemandURL, &sched.IdleTimeoutSec, &tagID, &sched.CreatedAt, &sched.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if tagID.Valid {
+		sched.TagID = &tagID.String
+	}
+	return &sched, nil
+}
+
+// --- Tag CRUD ---
+
+func (s *Store) CreateTag(tag *models.Tag) (*models.Tag, error) {
+	now := time.Now().UTC()
+	tag.ID = uuid.New().String()
+	tag.CreatedAt = now
+	tag.UpdatedAt = now
+
+	_, err := s.db.Exec(`
+		INSERT INTO tags (id, name, start_cron, stop_cron, enabled, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		tag.ID, tag.Name, tag.StartCron, tag.StopCron, tag.Enabled,
+		tag.CreatedAt, tag.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return tag, nil
+}
+
+func (s *Store) GetTag(id string) (*models.Tag, error) {
+	row := s.db.QueryRow(`
+		SELECT id, name, start_cron, stop_cron, enabled, created_at, updated_at
+		FROM tags WHERE id = ?`, id)
+	return scanTag(row)
+}
+
+func (s *Store) GetTagByName(name string) (*models.Tag, error) {
+	row := s.db.QueryRow(`
+		SELECT id, name, start_cron, stop_cron, enabled, created_at, updated_at
+		FROM tags WHERE name = ?`, name)
+	return scanTag(row)
+}
+
+func (s *Store) ListTags() ([]models.Tag, error) {
+	rows, err := s.db.Query(`
+		SELECT id, name, start_cron, stop_cron, enabled, created_at, updated_at
+		FROM tags ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []models.Tag
+	for rows.Next() {
+		var tag models.Tag
+		if err := rows.Scan(&tag.ID, &tag.Name, &tag.StartCron, &tag.StopCron, &tag.Enabled, &tag.CreatedAt, &tag.UpdatedAt); err != nil {
+			return nil, err
+		}
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
+func (s *Store) UpdateTag(tag *models.Tag) (*models.Tag, error) {
+	tag.UpdatedAt = time.Now().UTC()
+	_, err := s.db.Exec(`
+		UPDATE tags SET name=?, start_cron=?, stop_cron=?, enabled=?, updated_at=?
+		WHERE id=?`,
+		tag.Name, tag.StartCron, tag.StopCron, tag.Enabled, tag.UpdatedAt, tag.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return tag, nil
+}
+
+func (s *Store) DeleteTag(id string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec("DELETE FROM schedules WHERE tag_id = ?", id)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	_, err = tx.Exec("DELETE FROM tags WHERE id = ?", id)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+func scanTag(row *sql.Row) (*models.Tag, error) {
+	var tag models.Tag
+	err := row.Scan(&tag.ID, &tag.Name, &tag.StartCron, &tag.StopCron, &tag.Enabled, &tag.CreatedAt, &tag.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &tag, nil
 }
