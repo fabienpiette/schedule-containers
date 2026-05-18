@@ -18,6 +18,8 @@ REGISTRY_IMAGE ?= $(REGISTRY_DOMAIN)/$(REGISTRY_NAMESPACE)/$(BINARY):$(IMAGE_TAG
 REGISTRY_REPO ?= $(REGISTRY_NAMESPACE)/$(BINARY)
 PUSH_TAGS ?= latest
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
 .PHONY: build run test vet lint clean \
 	docker-build docker-up docker-down docker-logs docker-push docker-push-tags \
 	docker-release docker-verify docker-pull \
@@ -87,4 +89,7 @@ docker-verify:
 docker-pull:
 	docker pull $(REGISTRY_IMAGE)
 
-docker-release: docker-build docker-tag docker-push docker-verify
+docker-release: docker-build docker-tag docker-push
+	@echo "Pushing version tag $(VERSION)..."
+	docker tag $(DOCKER_IMAGE) $(REGISTRY_DOMAIN)/$(REGISTRY_NAMESPACE)/$(BINARY):$(VERSION)
+	docker push $(REGISTRY_DOMAIN)/$(REGISTRY_NAMESPACE)/$(BINARY):$(VERSION)
