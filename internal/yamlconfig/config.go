@@ -70,27 +70,57 @@ func FromSchedulesAndTags(schedules []models.Schedule, tags []models.Tag) []byte
 }
 
 func ToSchedules(data []byte) ([]models.Schedule, error) {
+	schedules, _, err := ToSchedulesAndTags(data)
+	return schedules, err
+}
+
+func ToSchedulesAndTags(data []byte) ([]models.Schedule, []models.Tag, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	var tags []models.Tag
+	for i, entry := range cfg.Tags {
+		if entry.Name == "" {
+			return nil, nil, fmt.Errorf("tag %d: name is required", i+1)
+		}
+		if entry.StartCron == "" {
+			return nil, nil, fmt.Errorf("tag %d (%s): start_cron is required", i+1, entry.Name)
+		}
+		if entry.StopCron == "" {
+			return nil, nil, fmt.Errorf("tag %d (%s): stop_cron is required", i+1, entry.Name)
+		}
+		if err := scheduler.ValidateCronExpression(entry.StartCron); err != nil {
+			return nil, nil, fmt.Errorf("tag %d (%s): invalid start_cron: %w", i+1, entry.Name, err)
+		}
+		if err := scheduler.ValidateCronExpression(entry.StopCron); err != nil {
+			return nil, nil, fmt.Errorf("tag %d (%s): invalid stop_cron: %w", i+1, entry.Name, err)
+		}
+		tags = append(tags, models.Tag{
+			Name:      entry.Name,
+			StartCron: entry.StartCron,
+			StopCron:  entry.StopCron,
+			Enabled:   entry.Enabled,
+		})
 	}
 
 	schedules := make([]models.Schedule, len(cfg.Schedules))
 	for i, entry := range cfg.Schedules {
 		if entry.ContainerName == "" {
-			return nil, fmt.Errorf("schedule %d: container is required", i+1)
+			return nil, nil, fmt.Errorf("schedule %d: container is required", i+1)
 		}
 		if entry.StartCron == "" {
-			return nil, fmt.Errorf("schedule %d (%s): start_cron is required", i+1, entry.ContainerName)
+			return nil, nil, fmt.Errorf("schedule %d (%s): start_cron is required", i+1, entry.ContainerName)
 		}
 		if entry.StopCron == "" {
-			return nil, fmt.Errorf("schedule %d (%s): stop_cron is required", i+1, entry.ContainerName)
+			return nil, nil, fmt.Errorf("schedule %d (%s): stop_cron is required", i+1, entry.ContainerName)
 		}
 		if err := scheduler.ValidateCronExpression(entry.StartCron); err != nil {
-			return nil, fmt.Errorf("schedule %d (%s): invalid start_cron: %w", i+1, entry.ContainerName, err)
+			return nil, nil, fmt.Errorf("schedule %d (%s): invalid start_cron: %w", i+1, entry.ContainerName, err)
 		}
 		if err := scheduler.ValidateCronExpression(entry.StopCron); err != nil {
-			return nil, fmt.Errorf("schedule %d (%s): invalid stop_cron: %w", i+1, entry.ContainerName, err)
+			return nil, nil, fmt.Errorf("schedule %d (%s): invalid stop_cron: %w", i+1, entry.ContainerName, err)
 		}
 		displayName := entry.DisplayName
 		if displayName == "" {
@@ -98,14 +128,14 @@ func ToSchedules(data []byte) ([]models.Schedule, error) {
 		}
 		schedules[i] = models.Schedule{
 			ContainerName: entry.ContainerName,
-			DisplayName:  displayName,
+			DisplayName:   displayName,
 			StackName:     entry.StackName,
 			StartCron:     entry.StartCron,
 			StopCron:      entry.StopCron,
 			Enabled:       entry.Enabled,
 		}
 	}
-	return schedules, nil
+	return schedules, tags, nil
 }
 
 func FromSchedules(schedules []models.Schedule) []byte {

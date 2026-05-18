@@ -284,3 +284,99 @@ func TestToSchedulesMissingStopCron(t *testing.T) {
 		t.Error("expected error for missing stop_cron")
 	}
 }
+func TestFromSchedulesAndTags(t *testing.T) {
+	tagID := "tag-123"
+	schedules := []models.Schedule{
+		{
+			ContainerName: "standalone",
+			DisplayName:   "standalone",
+			StartCron:     "0 9 * * *",
+			StopCron:      "0 17 * * *",
+			Enabled:       true,
+		},
+		{
+			ContainerName: "my-app",
+			DisplayName:   "my-app",
+			StartCron:     "0 8 * * 1-5",
+			StopCron:      "0 18 * * 1-5",
+			Enabled:       true,
+			TagID:         &tagID,
+		},
+	}
+	tags := []models.Tag{
+		{ID: tagID, Name: "business-hours", StartCron: "0 8 * * 1-5", StopCron: "0 18 * * 1-5", Enabled: true},
+	}
+
+	data := FromSchedulesAndTags(schedules, tags)
+	if len(data) == 0 {
+		t.Fatal("expected non-empty YAML output")
+	}
+
+	parsedSchedules, parsedTags, err := ToSchedulesAndTags(data)
+	if err != nil {
+		t.Fatalf("failed to parse exported YAML: %v", err)
+	}
+	if len(parsedSchedules) != 1 {
+		t.Errorf("expected 1 direct schedule, got %d", len(parsedSchedules))
+	}
+	if parsedSchedules[0].ContainerName != "standalone" {
+		t.Errorf("expected standalone schedule, got %s", parsedSchedules[0].ContainerName)
+	}
+	if len(parsedTags) != 1 {
+		t.Fatalf("expected 1 tag, got %d", len(parsedTags))
+	}
+	if parsedTags[0].Name != "business-hours" {
+		t.Errorf("expected tag name 'business-hours', got %s", parsedTags[0].Name)
+	}
+}
+
+func TestToSchedulesAndTagsValidation(t *testing.T) {
+	t.Run("valid tag", func(t *testing.T) {
+		yaml := `tags:
+  - name: business-hours
+    start_cron: "0 8 * * 1-5"
+    stop_cron: "0 18 * * 1-5"
+    enabled: true
+    containers:
+      - my-app
+`
+		schedules, tags, err := ToSchedulesAndTags([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(schedules) != 0 {
+			t.Errorf("expected 0 schedules, got %d", len(schedules))
+		}
+		if len(tags) != 1 {
+			t.Fatalf("expected 1 tag, got %d", len(tags))
+		}
+		if tags[0].Name != "business-hours" {
+			t.Errorf("expected tag name 'business-hours', got %s", tags[0].Name)
+		}
+	})
+
+	t.Run("tag missing name", func(t *testing.T) {
+		yaml := `tags:
+  - start_cron: "0 8 * * 1-5"
+    stop_cron: "0 18 * * 1-5"
+    enabled: true
+`
+		_, _, err := ToSchedulesAndTags([]byte(yaml))
+		if err == nil {
+			t.Error("expected error for missing tag name")
+		}
+	})
+
+	t.Run("tag invalid cron", func(t *testing.T) {
+		yaml := `tags:
+  - name: bad
+    start_cron: "invalid"
+    stop_cron: "0 18 * * 1-5"
+    enabled: true
+`
+		_, _, err := ToSchedulesAndTags([]byte(yaml))
+		if err == nil {
+			t.Error("expected error for invalid tag cron")
+		}
+	})
+}

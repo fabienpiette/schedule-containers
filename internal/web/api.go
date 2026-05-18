@@ -270,7 +270,7 @@ func (s *Server) apiImportSchedules(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	schedules, err := yamlconfig.ToSchedules(body)
+	schedules, tags, err := yamlconfig.ToSchedulesAndTags(body)
 	if err != nil {
 		http.Error(w, "failed to parse YAML: "+err.Error(), http.StatusBadRequest)
 		return
@@ -290,8 +290,21 @@ func (s *Server) apiImportSchedules(w http.ResponseWriter, r *http.Request) {
 		created++
 	}
 
+	tagsCreated := 0
+	for _, tag := range tags {
+		if _, err := s.store.CreateTag(&tag); err != nil {
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				slog.Warn("skipping existing tag during import", "name", tag.Name)
+				continue
+			}
+			slog.Error("failed to import tag", "name", tag.Name, "error", err)
+			continue
+		}
+		tagsCreated++
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]int{"imported": created, "total": len(schedules)})
+	json.NewEncoder(w).Encode(map[string]int{"imported": created, "total": len(schedules), "tags_imported": tagsCreated, "tags_total": len(tags)})
 }
 
 func (s *Server) apiExportSchedules(w http.ResponseWriter, r *http.Request) {
