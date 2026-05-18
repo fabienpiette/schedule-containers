@@ -492,3 +492,280 @@ func TestAPIImportSchedulesInvalidCron(t *testing.T) {
 		t.Errorf("expected 400, got %d", w.Code)
 	}
 }
+func TestAPIListTags(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/tags", nil)
+	srv.apiListTags(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+
+	var tags []models.Tag
+	if err := json.NewDecoder(w.Body).Decode(&tags); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+}
+
+func TestAPICreateTag(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	body := `{"name":"business-hours","start_cron":"0 8 * * 1-5","stop_cron":"0 18 * * 1-5","enabled":true}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/tags", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.apiCreateTag(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("expected 201, got %d, body: %s", w.Code, w.Body.String())
+	}
+
+	var tag models.Tag
+	json.NewDecoder(w.Body).Decode(&tag)
+	if tag.Name != "business-hours" {
+		t.Errorf("expected name 'business-hours', got %s", tag.Name)
+	}
+	if tag.ID == "" {
+		t.Error("expected non-empty ID")
+	}
+}
+
+func TestAPICreateTagInvalidCron(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	body := `{"name":"bad","start_cron":"invalid","stop_cron":"0 18 * * *"}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/tags", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.apiCreateTag(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestAPICreateTagDuplicateName(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	body := `{"name":"test-tag","start_cron":"0 8 * * *","stop_cron":"0 18 * * *"}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/tags", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.apiCreateTag(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", w.Code)
+	}
+
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodPost, "/api/tags", bytes.NewBufferString(body))
+	req2.Header.Set("Content-Type", "application/json")
+	srv.apiCreateTag(w2, req2)
+
+	if w2.Code != http.StatusConflict {
+		t.Errorf("expected 409 for duplicate name, got %d", w2.Code)
+	}
+}
+
+func TestAPIGetTag(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+
+	r := chi.NewRouter()
+	r.Get("/api/tags/{id}", srv.apiGetTag)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/tags/"+tag.ID, nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestAPIUpdateTag(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+
+	body := `{"name":"test","start_cron":"0 9 * * *","stop_cron":"0 18 * * *","enabled":true}`
+	r := chi.NewRouter()
+	r.Put("/api/tags/{id}", srv.apiUpdateTag)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/tags/"+tag.ID, bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+
+	var updated models.Tag
+	json.NewDecoder(w.Body).Decode(&updated)
+	if updated.StartCron != "0 9 * * *" {
+		t.Errorf("expected start_cron updated, got %s", updated.StartCron)
+	}
+}
+
+func TestAPIDeleteTag(t *testing.T) {
+	srv, mockSched := setupTestServer(t)
+
+	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tagID := tag.ID
+	sched, _ := srv.store.CreateSchedule(&models.Schedule{
+		ContainerName: "my-app",
+		DisplayName:   "my-app",
+		StartCron:     "0 8 * * *",
+		StopCron:      "0 18 * * *",
+		Enabled:       true,
+		TagID:         &tagID,
+	})
+	mockSched.added = nil
+
+	r := chi.NewRouter()
+	r.Delete("/api/tags/{id}", srv.apiDeleteTag)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/api/tags/"+tag.ID, nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", w.Code)
+	}
+
+	schedules, _ := srv.store.ListSchedules()
+	for _, s := range schedules {
+		if s.ID == sched.ID {
+			t.Error("tag-derived schedule should have been deleted")
+		}
+	}
+	if len(mockSched.removed) != 1 || mockSched.removed[0] != sched.ID {
+		t.Errorf("expected scheduler.RemoveSchedule called for %s", sched.ID)
+	}
+}
+
+func TestAPIToggleTag(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tagID := tag.ID
+	srv.store.CreateSchedule(&models.Schedule{
+		ContainerName: "my-app",
+		DisplayName:   "my-app",
+		StartCron:     "0 8 * * *",
+		StopCron:      "0 18 * * *",
+		Enabled:       true,
+		TagID:         &tagID,
+	})
+
+	r := chi.NewRouter()
+	r.Post("/api/tags/{id}/toggle", srv.apiToggleTag)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/tags/"+tag.ID+"/toggle", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+
+	var toggled models.Tag
+	json.NewDecoder(w.Body).Decode(&toggled)
+	if toggled.Enabled != false {
+		t.Errorf("expected tag Enabled=false after toggle, got %v", toggled.Enabled)
+	}
+
+	schedules, _ := srv.store.ListSchedulesByTag(tag.ID)
+	for _, s := range schedules {
+		if s.Enabled != false {
+			t.Errorf("expected schedule Enabled=false after tag toggle, got %v", s.Enabled)
+		}
+	}
+}
+
+func TestAPIApplyTagToContainers(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+
+	r := chi.NewRouter()
+	r.Post("/api/tags/{id}/containers", srv.apiApplyTagToContainers)
+
+	body := `{"containers":["my-app","redis"]}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/tags/"+tag.ID+"/containers", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+
+	schedules, _ := srv.store.ListSchedulesByTag(tag.ID)
+	if len(schedules) != 2 {
+		t.Errorf("expected 2 schedules for tag, got %d", len(schedules))
+	}
+}
+
+func TestAPIRemoveTagFromContainer(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tagID := tag.ID
+	srv.store.CreateSchedule(&models.Schedule{
+		ContainerName: "my-app",
+		DisplayName:   "my-app",
+		StartCron:     "0 8 * * *",
+		StopCron:      "0 18 * * *",
+		Enabled:       true,
+		TagID:         &tagID,
+	})
+
+	r := chi.NewRouter()
+	r.Delete("/api/tags/{id}/containers/{name}", srv.apiRemoveTagFromContainer)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/api/tags/"+tag.ID+"/containers/my-app", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", w.Code)
+	}
+
+	schedules, _ := srv.store.ListSchedulesByTag(tag.ID)
+	if len(schedules) != 0 {
+		t.Errorf("expected 0 schedules for tag after removal, got %d", len(schedules))
+	}
+}
+
+func TestAPIUpdateScheduleRejectsCronChangeForTagSchedule(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tagID := tag.ID
+	created, _ := srv.store.CreateSchedule(&models.Schedule{
+		ContainerName: "my-app",
+		DisplayName:   "my-app",
+		StartCron:     "0 8 * * *",
+		StopCron:      "0 18 * * *",
+		Enabled:       true,
+		TagID:         &tagID,
+	})
+
+	body := `{"container_name":"my-app","start_cron":"0 9 * * *","stop_cron":"0 18 * * *","enabled":true}`
+	r := chi.NewRouter()
+	r.Put("/api/schedules/{id}", srv.apiUpdateSchedule)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/schedules/"+created.ID, bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}

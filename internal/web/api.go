@@ -14,6 +14,10 @@ import (
 	"github.com/gndm/schedule-containers/internal/yamlconfig"
 )
 
+type applyRequest struct {
+	Containers []string `json:"containers"`
+}
+
 func (s *Server) apiListContainers(w http.ResponseWriter, r *http.Request) {
 	containers, err := s.docker.ListContainers(r.Context())
 	if err != nil {
@@ -32,8 +36,32 @@ func (s *Server) apiListSchedules(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list schedules", http.StatusInternalServerError)
 		return
 	}
+
+	type scheduleResponse struct {
+		models.Schedule
+		TagName string `json:"tag_name,omitempty"`
+	}
+
+	tagCache := make(map[string]string)
+	resp := make([]scheduleResponse, len(schedules))
+	for i, sched := range schedules {
+		r := scheduleResponse{Schedule: sched}
+		if sched.TagID != nil {
+			name, ok := tagCache[*sched.TagID]
+			if !ok {
+				tag, err := s.store.GetTag(*sched.TagID)
+				if err == nil {
+					name = tag.Name
+					tagCache[*sched.TagID] = name
+				}
+			}
+			r.TagName = name
+		}
+		resp[i] = r
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(schedules)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) apiCreateSchedule(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +123,12 @@ func (s *Server) apiUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 
 	req.ID = id
 	req.CreatedAt = existing.CreatedAt
+	req.TagID = existing.TagID
+
+	if req.TagID != nil && (req.StartCron != existing.StartCron || req.StopCron != existing.StopCron) {
+		http.Error(w, "Cannot edit cron on tag-derived schedule; update the tag instead", http.StatusBadRequest)
+		return
+	}
 
 	updated, err := s.store.UpdateSchedule(&req)
 	if err != nil {
@@ -268,7 +302,285 @@ func (s *Server) apiExportSchedules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := yamlconfig.FromSchedules(schedules)
+	tags, err := s.store.ListTags()
+	if err != nil {
+		slog.Error("failed to list tags", "error", err)
+		http.Error(w, "failed to list tags", http.StatusInternalServerError)
+		return
+	}
+
+	data := yamlconfig.FromSchedulesAndTags(schedules, tags)
 	w.Header().Set("Content-Type", "application/yaml")
 	w.Write(data)
+}
+
+// --- Tag API handlers ---
+
+func (s *Server) apiListTags(w http.ResponseWriter, r *http.Request) {
+	tags, err := s.store.ListTags()
+	if err != nil {
+		slog.Error("failed to list tags", "error", err)
+		http.Error(w, "failed to list tags", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tags)
+}
+
+func (s *Server) apiCreateTag(w http.ResponseWriter, r *http.Request) {
+	var req models.Tag
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	if req.StartCron == "" || req.StopCron == "" {
+		http.Error(w, "start_cron and stop_cron are required", http.StatusBadRequest)
+		return
+	}
+	if err := scheduler.ValidateCronExpression(req.StartCron); err != nil {
+		http.Error(w, "invalid start_cron: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := scheduler.ValidateCronExpression(req.StopCron); err != nil {
+		http.Error(w, "invalid stop_cron: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	created, err := s.store.CreateTag(&req)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			http.Error(w, "tag name already exists", http.StatusConflict)
+			return
+		}
+		slog.Error("failed to create tag", "error", err)
+		http.Error(w, "failed to create tag", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(created)
+}
+
+func (s *Server) apiGetTag(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	tag, err := s.store.GetTag(id)
+	if err != nil {
+		http.Error(w, "tag not found", http.StatusNotFound)
+		return
+	}
+	schedules, _ := s.store.ListSchedulesByTag(id)
+
+	type tagDetail struct {
+		models.Tag
+		Schedules []models.Schedule `json:"schedules"`
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tagDetail{Tag: *tag, Schedules: schedules})
+}
+
+func (s *Server) apiUpdateTag(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	existing, err := s.store.GetTag(id)
+	if err != nil {
+		http.Error(w, "tag not found", http.StatusNotFound)
+		return
+	}
+
+	var req models.Tag
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	req.ID = id
+	req.CreatedAt = existing.CreatedAt
+
+	if req.StartCron == "" {
+		req.StartCron = existing.StartCron
+	}
+	if req.StopCron == "" {
+		req.StopCron = existing.StopCron
+	}
+
+	if err := scheduler.ValidateCronExpression(req.StartCron); err != nil {
+		http.Error(w, "invalid start_cron: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := scheduler.ValidateCronExpression(req.StopCron); err != nil {
+		http.Error(w, "invalid stop_cron: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	cronChanged := req.StartCron != existing.StartCron || req.StopCron != existing.StopCron
+
+	updated, err := s.store.UpdateTag(&req)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			http.Error(w, "tag name already exists", http.StatusConflict)
+			return
+		}
+		slog.Error("failed to update tag", "error", err)
+		http.Error(w, "failed to update tag", http.StatusInternalServerError)
+		return
+	}
+
+	if cronChanged {
+		schedules, _ := s.store.ListSchedulesByTag(id)
+		for _, sched := range schedules {
+			sched.StartCron = updated.StartCron
+			sched.StopCron = updated.StopCron
+			updatedSched, err := s.store.UpdateSchedule(&sched)
+			if err != nil {
+				slog.Warn("failed to update tag schedule cron", "schedule_id", sched.ID, "error", err)
+				continue
+			}
+			s.scheduler.RemoveSchedule(sched.ID)
+			if updatedSched.Enabled {
+				if err := s.scheduler.AddSchedule(updatedSched); err != nil {
+					slog.Warn("failed to re-add schedule after tag cron update", "schedule_id", sched.ID, "error", err)
+				}
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updated)
+}
+
+func (s *Server) apiDeleteTag(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	schedules, _ := s.store.ListSchedulesByTag(id)
+	for _, sched := range schedules {
+		s.scheduler.RemoveSchedule(sched.ID)
+	}
+
+	if err := s.store.DeleteTag(id); err != nil {
+		http.Error(w, "tag not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) apiToggleTag(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	tag, err := s.store.GetTag(id)
+	if err != nil {
+		http.Error(w, "tag not found", http.StatusNotFound)
+		return
+	}
+
+	tag.Enabled = !tag.Enabled
+	updated, err := s.store.UpdateTag(tag)
+	if err != nil {
+		slog.Error("failed to toggle tag", "error", err)
+		http.Error(w, "failed to toggle tag", http.StatusInternalServerError)
+		return
+	}
+
+	schedules, _ := s.store.ListSchedulesByTag(id)
+	for _, sched := range schedules {
+		sched.Enabled = updated.Enabled
+		updatedSched, err := s.store.UpdateSchedule(&sched)
+		if err != nil {
+			slog.Warn("failed to update schedule enabled state", "schedule_id", sched.ID, "error", err)
+			continue
+		}
+		s.scheduler.RemoveSchedule(sched.ID)
+		if updatedSched.Enabled {
+			if err := s.scheduler.AddSchedule(updatedSched); err != nil {
+				slog.Warn("failed to re-add schedule after tag toggle", "schedule_id", sched.ID, "error", err)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updated)
+}
+
+func (s *Server) apiApplyTagToContainers(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	tag, err := s.store.GetTag(id)
+	if err != nil {
+		http.Error(w, "tag not found", http.StatusNotFound)
+		return
+	}
+
+	var req applyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if len(req.Containers) == 0 {
+		http.Error(w, "containers list is required", http.StatusBadRequest)
+		return
+	}
+
+	tagID := tag.ID
+	var created []models.Schedule
+	var skipped []string
+
+	for _, containerName := range req.Containers {
+		existing, _ := s.store.GetScheduleByTagAndContainer(tagID, containerName)
+		if existing != nil {
+			skipped = append(skipped, containerName)
+			continue
+		}
+
+		sched := &models.Schedule{
+			ContainerName:   containerName,
+			DisplayName:     containerName,
+			StartCron:       tag.StartCron,
+			StopCron:        tag.StopCron,
+			Enabled:         tag.Enabled,
+			TagID:           &tagID,
+			OnDemandEnabled: false,
+			OnDemandURL:     "",
+			IdleTimeoutSec:  0,
+		}
+		createdSched, err := s.store.CreateSchedule(sched)
+		if err != nil {
+			slog.Error("failed to create schedule for container", "container", containerName, "error", err)
+			continue
+		}
+		if createdSched.Enabled {
+			if err := s.scheduler.AddSchedule(createdSched); err != nil {
+				slog.Warn("failed to add schedule to cron runner", "schedule_id", createdSched.ID, "error", err)
+			}
+		}
+		created = append(created, *createdSched)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"created": created,
+		"skipped": skipped,
+	})
+}
+
+func (s *Server) apiRemoveTagFromContainer(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	containerName := chi.URLParam(r, "name")
+
+	sched, err := s.store.GetScheduleByTagAndContainer(id, containerName)
+	if err != nil {
+		http.Error(w, "no schedule found for this tag and container", http.StatusNotFound)
+		return
+	}
+
+	if err := s.store.DeleteSchedule(sched.ID); err != nil {
+		slog.Error("failed to delete schedule", "error", err)
+		http.Error(w, "failed to delete schedule", http.StatusInternalServerError)
+		return
+	}
+	s.scheduler.RemoveSchedule(sched.ID)
+	w.WriteHeader(http.StatusNoContent)
 }

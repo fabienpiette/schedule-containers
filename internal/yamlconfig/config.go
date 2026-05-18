@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	Schedules []ScheduleEntry `yaml:"schedules"`
+	Tags      []TagEntry      `yaml:"tags,omitempty"`
 }
 
 type ScheduleEntry struct {
@@ -23,19 +24,48 @@ type ScheduleEntry struct {
 	Enabled       bool   `yaml:"enabled"`
 }
 
-func FromSchedules(schedules []models.Schedule) []byte {
-	entries := make([]ScheduleEntry, len(schedules))
-	for i, s := range schedules {
-		entries[i] = ScheduleEntry{
-			ContainerName: s.ContainerName,
-			DisplayName:   s.DisplayName,
-			StackName:     s.StackName,
-			StartCron:     s.StartCron,
-			StopCron:      s.StopCron,
-			Enabled:       s.Enabled,
+type TagEntry struct {
+	Name        string   `yaml:"name"`
+	StartCron   string   `yaml:"start_cron"`
+	StopCron    string   `yaml:"stop_cron"`
+	Enabled     bool     `yaml:"enabled"`
+	Containers  []string `yaml:"containers"`
+}
+
+func FromSchedulesAndTags(schedules []models.Schedule, tags []models.Tag) []byte {
+	var directEntries []ScheduleEntry
+	tagSchedules := make(map[string][]models.Schedule)
+
+	for _, s := range schedules {
+		if s.TagID != nil {
+			tagSchedules[*s.TagID] = append(tagSchedules[*s.TagID], s)
+		} else {
+			directEntries = append(directEntries, ScheduleEntry{
+				ContainerName: s.ContainerName,
+				DisplayName:   s.DisplayName,
+				StackName:     s.StackName,
+				StartCron:     s.StartCron,
+				StopCron:      s.StopCron,
+				Enabled:       s.Enabled,
+			})
 		}
 	}
-	data, _ := yaml.Marshal(&Config{Schedules: entries})
+
+	var tagEntries []TagEntry
+	for _, tag := range tags {
+		entry := TagEntry{
+			Name:      tag.Name,
+			StartCron: tag.StartCron,
+			StopCron:  tag.StopCron,
+			Enabled:   tag.Enabled,
+		}
+		for _, s := range tagSchedules[tag.ID] {
+			entry.Containers = append(entry.Containers, s.ContainerName)
+		}
+		tagEntries = append(tagEntries, entry)
+	}
+
+	data, _ := yaml.Marshal(&Config{Tags: tagEntries, Schedules: directEntries})
 	return data
 }
 
@@ -76,6 +106,10 @@ func ToSchedules(data []byte) ([]models.Schedule, error) {
 		}
 	}
 	return schedules, nil
+}
+
+func FromSchedules(schedules []models.Schedule) []byte {
+	return FromSchedulesAndTags(schedules, nil)
 }
 
 func ExportToFile(schedules []models.Schedule, path string) error {
