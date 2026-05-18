@@ -1,0 +1,72 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>Dashboard</h1>
+
+<h2>Schedules</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Container</th>
+            <th>Stack</th>
+            <th>Start Cron</th>
+            <th>Stop Cron</th>
+            <th>Enabled</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Schedules}}
+        <tr>
+            <td>{{.DisplayName}}</td>
+            <td>{{.StackName}}</td>
+            <td><code>{{.StartCron}}</code></td>
+            <td><code>{{.StopCron}}</code></td>
+            <td>
+                {{if .Enabled}}<span class="badge-enabled">Enabled</span>{{else}}<span class="badge-disabled">Disabled</span>{{end}}
+            </td>
+            <td>
+                <button hx-post="/api/schedules/{{.ID}}/toggle" hx-swap="outerHTML" hx-target="closest tr">
+                    {{if .Enabled}}Disable{{else}}Enable{{end}}
+                </button>
+                <button hx-delete="/api/schedules/{{.ID}}" hx-swap="outerHTML" hx-target="closest tr" hx-confirm="Delete this schedule?">Delete</button>
+            </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6">No schedules configured</td></tr>
+        {{end}}
+    </tbody>
+</table>
+
+<h2>Containers</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Image</th>
+            <th>State</th>
+            <th>Stack</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Containers}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td>{{.Image}}</td>
+            <td class="state-{{.State}}">{{.State}}</td>
+            <td>{{.StackName}}</td>
+            <td>
+                {{if eq .State "running"}}
+                <button hx-post="/api/containers/{{.Name}}/stop" hx-swap="none" hx-confirm="Stop {{.Name}}?">Stop</button>
+                {{else}}
+                <button hx-post="/api/containers/{{.Name}}/start" hx-swap="none" hx-confirm="Start {{.Name}}?">Start</button>
+                {{end}}
+            </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5">No containers found</td></tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}

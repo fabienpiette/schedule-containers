@@ -4,6 +4,7 @@ go 1.25.3
 
 require (
 	github.com/docker/docker v28.5.2+incompatible
+	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/uuid v1.6.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cobra v1.10.2

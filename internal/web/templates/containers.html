@@ -1,0 +1,37 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>Containers</h1>
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Image</th>
+            <th>State</th>
+            <th>Status</th>
+            <th>Stack</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Containers}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td>{{.Image}}</td>
+            <td class="state-{{.State}}">{{.State}}</td>
+            <td>{{.Status}}</td>
+            <td>{{.StackName}}</td>
+            <td>
+                {{if eq .State "running"}}
+                <button hx-post="/api/containers/{{.Name}}/stop" hx-swap="none" hx-confirm="Stop {{.Name}}?">Stop</button>
+                {{else}}
+                <button hx-post="/api/containers/{{.Name}}/start" hx-swap="none" hx-confirm="Start {{.Name}}?">Start</button>
+                {{end}}
+            </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6">No containers found</td></tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}
