@@ -2,6 +2,8 @@ package web
 
 import (
 	"net/http"
+
+	"github.com/gndm/schedule-containers/internal/cronpresets"
 )
 
 type DashboardData struct {
@@ -28,6 +30,15 @@ type ContainerView struct {
 	State     string
 	Status    string
 	StackName string
+}
+
+type PresetView struct {
+	ID          string
+	Label       string
+	Expression  string
+	Category    string
+	Description string
+	Builtin     bool
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -115,4 +126,45 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.templates.ExecuteTemplate(w, "schedules.html", data)
+}
+
+func (s *Server) handlePresets(w http.ResponseWriter, r *http.Request) {
+	builtins := cronpresets.Builtins()
+	custom, _ := s.store.ListCustomPresets()
+
+	builtinViews := make([]PresetView, len(builtins))
+	for i, p := range builtins {
+		builtinViews[i] = PresetView{
+			ID:          p.ID,
+			Label:       p.Label,
+			Expression:  p.Expression,
+			Category:    p.Category,
+			Description: p.Description,
+			Builtin:     p.Builtin,
+		}
+	}
+
+	customViews := make([]PresetView, len(custom))
+	for i, p := range custom {
+		customViews[i] = PresetView{
+			ID:          p.ID,
+			Label:       p.Label,
+			Expression:  p.Expression,
+			Category:    p.Category,
+			Description: p.Description,
+			Builtin:     p.Builtin,
+		}
+	}
+
+	data := struct {
+		Title           string
+		BuiltinPresets  []PresetView
+		CustomPresets   []PresetView
+	}{
+		Title:          "Presets",
+		BuiltinPresets: builtinViews,
+		CustomPresets:  customViews,
+	}
+
+	s.templates.ExecuteTemplate(w, "presets.html", data)
 }

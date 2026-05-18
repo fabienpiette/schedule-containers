@@ -42,6 +42,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		"templates/dashboard.html",
 		"templates/containers.html",
 		"templates/schedules.html",
+		"templates/presets.html",
 		"templates/partials.html",
 	))
 
@@ -61,6 +62,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	r.Get("/", srv.handleDashboard)
 	r.Get("/containers", srv.handleContainers)
 	r.Get("/schedules", srv.handleSchedulesNew)
+	r.Get("/presets", srv.handlePresets)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/containers", srv.apiListContainers)

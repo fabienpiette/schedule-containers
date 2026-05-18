@@ -1,0 +1,106 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>Cron Presets</h1>
+
+<h2>Built-in Presets</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Label</th>
+            <th>Expression</th>
+            <th>Category</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .BuiltinPresets}}
+        <tr>
+            <td>{{.Label}}</td>
+            <td><code>{{.Expression}}</code></td>
+            <td>{{.Category}}</td>
+            <td>{{.Description}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4">No built-in presets</td></tr>
+        {{end}}
+    </tbody>
+</table>
+
+<h2>Custom Presets</h2>
+
+{{if .CustomPresets}}
+<table>
+    <thead>
+        <tr>
+            <th>Label</th>
+            <th>Expression</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .CustomPresets}}
+        <tr>
+            <td>{{.Label}}</td>
+            <td><code>{{.Expression}}</code></td>
+            <td>{{.Category}}</td>
+            <td>{{.Description}}</td>
+            <td>
+                <button hx-delete="/api/presets/{{.ID}}" hx-swap="outerHTML" hx-target="closest tr" hx-confirm="Delete preset '{{.Label}}'?">Delete</button>
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p>No custom presets yet. Create one below.</p>
+{{end}}
+
+<h2>Create Custom Preset</h2>
+<form id="preset-form">
+    <label for="label">Label</label>
+    <input type="text" name="label" id="label" placeholder="e.g. Weekdays at 10am" required>
+
+    <label for="expression">Cron Expression</label>
+    <input type="text" name="expression" id="expression" placeholder="0 10 * * 1-5" required>
+    <small>Standard 5-field format: min hour day month weekday</small>
+
+    <label for="category">Category</label>
+    <input type="text" name="category" id="category" placeholder="Custom" value="Custom">
+
+    <label for="description">Description</label>
+    <input type="text" name="description" id="description" placeholder="Weekdays at 10:00 AM">
+
+    <button type="submit">Create Preset</button>
+</form>
+
+<script>
+document.getElementById('preset-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        label: form.label.value,
+        expression: form.expression.value,
+        category: form.category.value || 'Custom',
+        description: form.description.value
+    };
+    try {
+        const resp = await fetch('/api/presets', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if (resp.ok) {
+            window.location.reload();
+        } else {
+            const text = await resp.text();
+            alert('Error: ' + text);
+        }
+    } catch(err) {
+        alert('Error: ' + err.message);
+    }
+});
+</script>
+{{end}}
