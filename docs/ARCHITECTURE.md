@@ -108,7 +108,7 @@ Key files: `scheduler.go`
 
 HTTP server, REST API handlers, and Go templates with HTMX. Chi router for routing, `embed.FS` for templates and static assets baked into the binary. The `SchedulerService` interface decouples the web layer from the concrete `scheduler.Scheduler` type.
 
-API routes include schedule CRUD, container start/stop, cron presets (list builtins + custom, create/delete custom), and YAML import/export.
+API routes include schedule CRUD, container start/stop, cron presets (list builtins + custom, create/delete custom), and YAML import/export. HTML pages include a dashboard, containers view, schedule creation form (with preset dropdowns), and a presets management page for CRUD on custom presets.
 
 Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go` (HTML rendering), `templates/`, `static/`
 
@@ -141,5 +141,5 @@ To add a new schedule field (e.g., `timezone`):
 4. Update `internal/web/handlers.go` — add `Timezone` to `ScheduleView` and the template data
 5. Update `internal/web/templates/dashboard.html` — add a column to the schedules table
 6. Update `internal/cli/schedule.go` — add a `--timezone` flag to the `add` command
-8. Update `internal/yamlconfig/config.go` — add the field to `ScheduleEntry` and the serialization/deserialization logic
-9. Add tests in `internal/store/store_test.go`
+7. Update `internal/yamlconfig/config.go` — add the field to `ScheduleEntry` and the serialization/deserialization logic
+8. Add tests in `internal/store/store_test.go`

@@ -114,7 +114,7 @@ curl -X POST http://localhost:8080/api/import \
 
 ### Dashboard
 
-Open `http://localhost:8080` for the web interface — view containers, manage schedules, start/stop containers with one click. Use the preset dropdowns to quickly set cron expressions, and export/import schedules as YAML.
+Open `http://localhost:8080` for the web interface — view containers, manage schedules, start/stop containers with one click. Use the preset dropdowns to quickly set cron expressions, manage custom presets at `/presets`, and export/import schedules as YAML.
 
 For all options: `schedule-containers --help`
 
