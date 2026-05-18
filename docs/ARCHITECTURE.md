@@ -58,9 +58,9 @@ Key files: `serve.go`, `schedule.go`
 
 ### `internal/models/`
 
-Pure data types: `Schedule` and `Container`. No logic, no dependencies. Every other package imports this one.
+Pure data types: `Schedule`, `Container`, and `CronPreset`. No logic, no dependencies. Every other package imports this one.
 
-Key files: `schedule.go`, `container.go`
+Key files: `schedule.go`, `container.go`, `preset.go`
 
 ### `internal/config/`
 
@@ -70,11 +70,23 @@ Key files: `config.go`
 
 ### `internal/store/`
 
-SQLite persistence for schedules. Uses `modernc.org/sqlite` (pure Go, no CGO). The `Open` function runs schema migrations on startup, including a `schema_version` table for future migrations. CRUD operations are straightforward — create, get, list, update, delete, toggle.
+SQLite persistence for schedules and custom cron presets. Uses `modernc.org/sqlite` (pure Go, no CGO). The `Open` function runs schema migrations on startup, including a `schema_version` table for future migrations. CRUD operations are straightforward — create, get, list, update, delete, toggle for schedules; create, list, get, delete for custom presets.
 
 Key files: `store.go`
 
 **Architecture Invariant:** The store never imports from `scheduler`, `web`, or `docker`. It is a leaf dependency.
+
+### `internal/cronpresets/`
+
+Built-in cron preset definitions. `Builtins()` returns a `[]models.CronPreset` with common schedules organized by category (Daily, Weekdays, Weekends, Specific Days, Frequent, Monthly). Presets have a `Builtin: true` flag that prevents deletion via the API.
+
+Key files: `presets.go`
+
+### `internal/yamlconfig/`
+
+YAML import/export for schedules. `FromSchedules` serializes schedules to YAML bytes. `ToSchedules` parses and validates YAML into schedule models (validates cron expressions via `scheduler.ValidateCronExpression`). `ImportFromFile` reads a file and delegates to `ToSchedules`.
+
+Key files: `config.go`
 
 ### `internal/docker/`
 
@@ -96,13 +108,15 @@ Key files: `scheduler.go`
 
 HTTP server, REST API handlers, and Go templates with HTMX. Chi router for routing, `embed.FS` for templates and static assets baked into the binary. The `SchedulerService` interface decouples the web layer from the concrete `scheduler.Scheduler` type.
 
+API routes include schedule CRUD, container start/stop, cron presets (list builtins + custom, create/delete custom), and YAML import/export.
+
 Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go` (HTML rendering), `templates/`, `static/`
 
 **Architecture Invariant:** The web layer depends on `scheduler.SchedulerService` (interface), not `scheduler.Scheduler` (concrete). This allows testing with a mock scheduler.
 
 ## Invariants
 
-- **Dependency direction:** `models` ← `config` ← `store` ← `docker` ← `scheduler` ← `web`/`cli`. No cycles. The store is a leaf; it never imports from scheduler, web, or docker.
+- **Dependency direction:** `models` ← `config` ← `store`/`cronpresets` ← `docker` ← `scheduler` ← `yamlconfig` ← `web`/`cli`. No cycles. `store` and `cronpresets` are leaves; they never import from scheduler, web, or docker.
 - **Store is offline-only for CLI:** The `schedule add` CLI command writes to SQLite directly. The running server reads schedules from SQLite on startup. Changes made while the server is running (via API) immediately update the cron runner. CLI-only changes take effect on next server restart.
 - **Per-container serialization:** The scheduler holds a map of `sync.Mutex` per container name. Two cron jobs targeting the same container will never run concurrently — they wait for the mutex.
 - **Cron format:** Always 5-field standard (`min hour day month weekday`), not 6-field with seconds. `ValidateCronExpression` uses `cron.ParseStandard`.
@@ -127,4 +141,5 @@ To add a new schedule field (e.g., `timezone`):
 4. Update `internal/web/handlers.go` — add `Timezone` to `ScheduleView` and the template data
 5. Update `internal/web/templates/dashboard.html` — add a column to the schedules table
 6. Update `internal/cli/schedule.go` — add a `--timezone` flag to the `add` command
-7. Add tests in `internal/store/store_test.go`
+8. Update `internal/yamlconfig/config.go` — add the field to `ScheduleEntry` and the serialization/deserialization logic
+9. Add tests in `internal/store/store_test.go`
