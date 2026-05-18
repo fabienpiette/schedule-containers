@@ -18,6 +18,7 @@
             <th>Stack</th>
             <th>Start Cron</th>
             <th>Stop Cron</th>
+            <th>Tag</th>
             <th>Enabled</th>
             <th>Actions</th>
         </tr>
@@ -29,6 +30,7 @@
             <td>{{.StackName}}</td>
             <td><code>{{.StartCron}}</code></td>
             <td><code>{{.StopCron}}</code></td>
+            <td>{{if .TagName}}<a href="/tags">{{.TagName}}</a>{{end}}</td>
             <td>
                 {{if .Enabled}}<span class="badge-enabled">Enabled</span>{{else}}<span class="badge-disabled">Disabled</span>{{end}}
             </td>
@@ -40,7 +42,7 @@
             </td>
         </tr>
         {{else}}
-        <tr><td colspan="6">No schedules configured</td></tr>
+        <tr><td colspan="7">No schedules configured</td></tr>
         {{end}}
     </tbody>
 </table>

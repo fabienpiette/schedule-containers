@@ -19,6 +19,7 @@ type ScheduleView struct {
 	StopCron        string
 	Enabled         bool
 	OnDemandEnabled bool
+	TagName         string
 }
 
 type ContainerView struct {
@@ -38,13 +39,28 @@ type PresetView struct {
 	Description string
 }
 
+type TagView struct {
+	ID             string
+	Name           string
+	StartCron      string
+	StopCron       string
+	Enabled         bool
+	ContainerCount int
+}
+
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	schedules, _ := s.store.ListSchedules()
 	containers, _ := s.docker.ListContainers(r.Context())
 
+	tagCache := make(map[string]string)
+	tags, _ := s.store.ListTags()
+	for _, tag := range tags {
+		tagCache[tag.ID] = tag.Name
+	}
+
 	scheduleViews := make([]ScheduleView, len(schedules))
 	for i, sched := range schedules {
-		scheduleViews[i] = ScheduleView{
+		sv := ScheduleView{
 			ID:              sched.ID,
 			ContainerName:   sched.ContainerName,
 			DisplayName:     sched.DisplayName,
@@ -54,6 +70,10 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			Enabled:         sched.Enabled,
 			OnDemandEnabled: sched.OnDemandEnabled,
 		}
+		if sched.TagID != nil {
+			sv.TagName = tagCache[*sched.TagID]
+		}
+		scheduleViews[i] = sv
 	}
 
 	containerViews := make([]ContainerView, len(containers))
@@ -148,4 +168,31 @@ func (s *Server) handlePresets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.templates["presets.html"].ExecuteTemplate(w, "layout", data)
+}
+
+func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
+	tags, _ := s.store.ListTags()
+
+	tagViews := make([]TagView, len(tags))
+	for i, tag := range tags {
+		schedules, _ := s.store.ListSchedulesByTag(tag.ID)
+		tagViews[i] = TagView{
+			ID:             tag.ID,
+			Name:           tag.Name,
+			StartCron:      tag.StartCron,
+			StopCron:       tag.StopCron,
+			Enabled:        tag.Enabled,
+			ContainerCount: len(schedules),
+		}
+	}
+
+	data := struct {
+		Title string
+		Tags  []TagView
+	}{
+		Title: "Tags",
+		Tags:  tagViews,
+	}
+
+	s.templates["tags.html"].ExecuteTemplate(w, "layout", data)
 }

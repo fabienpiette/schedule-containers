@@ -48,6 +48,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		"containers.html": "templates/containers.html",
 		"schedules.html":  "templates/schedules.html",
 		"presets.html":    "templates/presets.html",
+		"tags.html":       "templates/tags.html",
 	}
 
 	templates := make(map[string]*template.Template)
@@ -74,6 +75,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	r.Get("/containers", srv.handleContainers)
 	r.Get("/schedules", srv.handleSchedulesNew)
 	r.Get("/presets", srv.handlePresets)
+	r.Get("/tags", srv.handleTags)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/containers", srv.apiListContainers)

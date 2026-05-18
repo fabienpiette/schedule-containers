@@ -1,0 +1,129 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>Tags</h1>
+
+<div class="actions-bar">
+    <a href="/tags/new" class="button">New Tag</a>
+</div>
+
+<h2>All Tags</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Start Cron</th>
+            <th>Stop Cron</th>
+            <th>Status</th>
+            <th>Containers</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Tags}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td><code>{{.StartCron}}</code></td>
+            <td><code>{{.StopCron}}</code></td>
+            <td>
+                {{if .Enabled}}<span class="badge-enabled">Enabled</span>{{else}}<span class="badge-disabled">Disabled</span>{{end}}
+            </td>
+            <td>{{.ContainerCount}}</td>
+            <td>
+                <button hx-post="/api/tags/{{.ID}}/toggle" hx-swap="outerHTML" hx-target="closest tr" hx-confirm="Toggle this tag?">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+                <button hx-delete="/api/tags/{{.ID}}" hx-swap="outerHTML" hx-target="closest tr" hx-confirm="Delete tag '{{.Name}}' and all its schedules?" onclick="setTimeout(function(){location.reload()}, 500)">Delete</button>
+            </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6">No tags configured</td></tr>
+        {{end}}
+    </tbody>
+</table>
+
+<h2>Create Tag</h2>
+<form id="tag-form">
+    <label for="name">Name</label>
+    <input type="text" name="name" id="name" placeholder="e.g. business-hours" required>
+
+    <label for="start_preset">Start Cron Preset</label>
+    <select id="start_preset">
+        <option value="">-- Select a preset or type custom --</option>
+    </select>
+    <label for="start_cron">Start Cron Expression</label>
+    <input type="text" name="start_cron" id="start_cron" placeholder="0 8 * * 1-5" required>
+    <small>Standard 5-field format: min hour day month weekday</small>
+
+    <label for="stop_preset">Stop Cron Preset</label>
+    <select id="stop_preset">
+        <option value="">-- Select a preset or type custom --</option>
+    </select>
+    <label for="stop_cron">Stop Cron Expression</label>
+    <input type="text" name="stop_cron" id="stop_cron" placeholder="0 18 * * 1-5" required>
+    <small>Standard 5-field format: min hour day month weekday</small>
+
+    <button type="submit">Create Tag</button>
+</form>
+
+<script>
+document.getElementById('start_preset').addEventListener('change', function() {
+    if (this.value) {
+        document.getElementById('start_cron').value = this.value;
+    }
+});
+document.getElementById('stop_preset').addEventListener('change', function() {
+    if (this.value) {
+        document.getElementById('stop_cron').value = this.value;
+    }
+});
+
+fetch('/api/presets')
+    .then(r => r.json())
+    .then(presets => {
+        const categories = {};
+        presets.forEach(p => {
+            if (!categories[p.category]) categories[p.category] = [];
+            categories[p.category].push(p);
+        });
+        ['start_preset', 'stop_preset'].forEach(selId => {
+            const sel = document.getElementById(selId);
+            Object.entries(categories).forEach(([cat, items]) => {
+                const group = document.createElement('optgroup');
+                group.label = cat;
+                items.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.expression;
+                    opt.textContent = p.label;
+                    group.appendChild(opt);
+                });
+                if (group.children.length > 0) sel.appendChild(group);
+            }
+        });
+    });
+
+document.getElementById('tag-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        name: form.name.value,
+        start_cron: form.start_cron.value,
+        stop_cron: form.stop_cron.value,
+        enabled: true
+    };
+    try {
+        const resp = await fetch('/api/tags', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if (resp.ok) {
+            window.location.reload();
+        } else {
+            const text = await resp.text();
+            alert('Error: ' + text);
+        }
+    } catch(err) {
+        alert('Error: ' + err.message);
+    }
+});
+</script>
+{{end}}
