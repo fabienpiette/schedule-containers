@@ -50,16 +50,6 @@ func (s *Store) migrate() error {
 			idle_timeout_sec INTEGER NOT NULL DEFAULT 0,
 			created_at TIMESTAMP NOT NULL,
 			updated_at TIMESTAMP NOT NULL
-		);
-
-		CREATE TABLE IF NOT EXISTS custom_presets (
-			id TEXT PRIMARY KEY,
-			label TEXT NOT NULL,
-			expression TEXT NOT NULL,
-			category TEXT NOT NULL DEFAULT 'Custom',
-			description TEXT NOT NULL DEFAULT '',
-			created_at TIMESTAMP NOT NULL,
-			updated_at TIMESTAMP NOT NULL
 		)`)
 	return err
 }
@@ -141,64 +131,6 @@ func (s *Store) ToggleSchedule(id string) (*models.Schedule, error) {
 	}
 	sched.Enabled = !sched.Enabled
 	return s.UpdateSchedule(sched)
-}
-
-func (s *Store) CreateCustomPreset(preset *models.CronPreset) (*models.CronPreset, error) {
-	now := time.Now().UTC()
-	preset.ID = uuid.New().String()
-	preset.CreatedAt = now
-	preset.UpdatedAt = now
-	preset.Builtin = false
-
-	_, err := s.db.Exec(`
-		INSERT INTO custom_presets (id, label, expression, category, description, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		preset.ID, preset.Label, preset.Expression, preset.Category, preset.Description,
-		preset.CreatedAt, preset.UpdatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return preset, nil
-}
-
-func (s *Store) ListCustomPresets() ([]models.CronPreset, error) {
-	rows, err := s.db.Query(`
-		SELECT id, label, expression, category, description, created_at, updated_at
-		FROM custom_presets ORDER BY created_at`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var presets []models.CronPreset
-	for rows.Next() {
-		var p models.CronPreset
-		if err := rows.Scan(&p.ID, &p.Label, &p.Expression, &p.Category, &p.Description, &p.CreatedAt, &p.UpdatedAt); err != nil {
-			return nil, err
-		}
-		p.Builtin = false
-		presets = append(presets, p)
-	}
-	return presets, rows.Err()
-}
-
-func (s *Store) GetCustomPreset(id string) (*models.CronPreset, error) {
-	row := s.db.QueryRow(`
-		SELECT id, label, expression, category, description, created_at, updated_at
-		FROM custom_presets WHERE id = ?`, id)
-	var p models.CronPreset
-	err := row.Scan(&p.ID, &p.Label, &p.Expression, &p.Category, &p.Description, &p.CreatedAt, &p.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-	p.Builtin = false
-	return &p, nil
-}
-
-func (s *Store) DeleteCustomPreset(id string) error {
-	_, err := s.db.Exec("DELETE FROM custom_presets WHERE id = ?", id)
-	return err
 }
 
 func scanSchedule(row *sql.Row) (*models.Schedule, error) {

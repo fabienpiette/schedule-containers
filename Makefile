@@ -29,7 +29,7 @@ build:
 	go build -o $(BINARY) $(CMD)
 
 run: build
-	DB_PATH=./schedule-containers.db ./$(BINARY) serve
+	DB_PATH=./schedule-containers.db PRESETS_PATH=./presets.yaml ./$(BINARY) serve
 
 test:
 	go test ./internal/... -count=1

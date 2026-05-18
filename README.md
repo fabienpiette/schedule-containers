@@ -26,7 +26,7 @@ docker compose up -d
 ## Features
 
 - **Cron scheduling** — Start and stop containers on any cron expression (`0 8 * * 1-5` = weekdays at 8am)
-- **Cron preset selectors** — Built-in presets (daily, weekdays, weekends, etc.) plus custom presets via API
+- **Cron preset selectors** — Default presets from embedded YAML, plus create/delete custom presets via API or web UI
 - **YAML import/export** — Export schedules as YAML, import from file or API
 - **Web dashboard** — Go templates + HTMX, single binary, no JS build step
 - **REST API** — Full CRUD for schedules, presets, import/export, container start/stop
@@ -95,7 +95,7 @@ curl -X POST http://localhost:8080/api/containers/my-app/start
 # Toggle a schedule on/off
 curl -X POST http://localhost:8080/api/schedules/<id>/toggle
 
-# List cron presets (built-in + custom)
+# List cron presets
 curl http://localhost:8080/api/presets
 
 # Create a custom preset
@@ -127,6 +127,7 @@ For all options: `schedule-containers --help`
 | `WEB_PORT` | `8080` | Web server port |
 | `WEB_HOST` | `0.0.0.0` | Web server bind address |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `PRESETS_PATH` | *(empty — uses embedded)* | Path to custom presets YAML file; if set and file doesn't exist, embedded defaults are copied to it |
 
 ## Known Issues
 

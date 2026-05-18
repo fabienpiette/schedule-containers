@@ -14,6 +14,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/gndm/schedule-containers/internal/config"
+	"github.com/gndm/schedule-containers/internal/cronpresets"
 	"github.com/gndm/schedule-containers/internal/docker"
 	"github.com/gndm/schedule-containers/internal/models"
 	"github.com/gndm/schedule-containers/internal/store"
@@ -26,31 +27,41 @@ type SchedulerService interface {
 }
 
 type Server struct {
-	httpServer *http.Server
-	store      *store.Store
-	docker     *docker.Client
-	scheduler  SchedulerService
-	templates  *template.Template
+	httpServer    *http.Server
+	store         *store.Store
+	docker        *docker.Client
+	scheduler     SchedulerService
+	presetService *cronpresets.Service
+	templates     map[string]*template.Template
 }
 
 //go:embed templates/* static/*
 var embeddedFS embed.FS
 
-func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService) *Server {
-	tmpl := template.Must(template.New("").ParseFS(embeddedFS,
+func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service) *Server {
+	baseFiles := []string{
 		"templates/layout.html",
-		"templates/dashboard.html",
-		"templates/containers.html",
-		"templates/schedules.html",
-		"templates/presets.html",
 		"templates/partials.html",
-	))
+	}
+	pages := map[string]string{
+		"dashboard.html":  "templates/dashboard.html",
+		"containers.html": "templates/containers.html",
+		"schedules.html":  "templates/schedules.html",
+		"presets.html":    "templates/presets.html",
+	}
+
+	templates := make(map[string]*template.Template)
+	for name, pageFile := range pages {
+		files := append(baseFiles, pageFile)
+		templates[name] = template.Must(template.New("").ParseFS(embeddedFS, files...))
+	}
 
 	srv := &Server{
-		store:     s,
-		docker:    d,
-		scheduler: sched,
-		templates: tmpl,
+		store:         s,
+		docker:        d,
+		scheduler:     sched,
+		presetService: ps,
+		templates:     templates,
 	}
 
 	r := chi.NewRouter()

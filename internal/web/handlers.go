@@ -2,8 +2,6 @@ package web
 
 import (
 	"net/http"
-
-	"github.com/gndm/schedule-containers/internal/cronpresets"
 )
 
 type DashboardData struct {
@@ -38,7 +36,6 @@ type PresetView struct {
 	Expression  string
 	Category    string
 	Description string
-	Builtin     bool
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +74,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		Containers: containerViews,
 	}
 
-	s.templates.ExecuteTemplate(w, "dashboard.html", data)
+	s.templates["dashboard.html"].ExecuteTemplate(w, "layout", data)
 }
 
 func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +100,7 @@ func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 		Containers: containerViews,
 	}
 
-	s.templates.ExecuteTemplate(w, "containers.html", data)
+	s.templates["containers.html"].ExecuteTemplate(w, "layout", data)
 }
 
 func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
@@ -125,46 +122,30 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 		Containers: containerViews,
 	}
 
-	s.templates.ExecuteTemplate(w, "schedules.html", data)
+	s.templates["schedules.html"].ExecuteTemplate(w, "layout", data)
 }
 
 func (s *Server) handlePresets(w http.ResponseWriter, r *http.Request) {
-	builtins := cronpresets.Builtins()
-	custom, _ := s.store.ListCustomPresets()
+	presets := s.presetService.List()
 
-	builtinViews := make([]PresetView, len(builtins))
-	for i, p := range builtins {
-		builtinViews[i] = PresetView{
+	presetViews := make([]PresetView, len(presets))
+	for i, p := range presets {
+		presetViews[i] = PresetView{
 			ID:          p.ID,
 			Label:       p.Label,
 			Expression:  p.Expression,
 			Category:    p.Category,
 			Description: p.Description,
-			Builtin:     p.Builtin,
-		}
-	}
-
-	customViews := make([]PresetView, len(custom))
-	for i, p := range custom {
-		customViews[i] = PresetView{
-			ID:          p.ID,
-			Label:       p.Label,
-			Expression:  p.Expression,
-			Category:    p.Category,
-			Description: p.Description,
-			Builtin:     p.Builtin,
 		}
 	}
 
 	data := struct {
-		Title           string
-		BuiltinPresets  []PresetView
-		CustomPresets   []PresetView
+		Title   string
+		Presets []PresetView
 	}{
-		Title:          "Presets",
-		BuiltinPresets: builtinViews,
-		CustomPresets:  customViews,
+		Title:   "Presets",
+		Presets: presetViews,
 	}
 
-	s.templates.ExecuteTemplate(w, "presets.html", data)
+	s.templates["presets.html"].ExecuteTemplate(w, "layout", data)
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/gndm/schedule-containers/internal/config"
+	"github.com/gndm/schedule-containers/internal/cronpresets"
 	"github.com/gndm/schedule-containers/internal/docker"
 	"github.com/gndm/schedule-containers/internal/models"
 	"github.com/gndm/schedule-containers/internal/store"
@@ -32,11 +33,18 @@ func setupTestServer(t *testing.T) (*Server, *mockSchedulerService) {
 	}
 	t.Cleanup(func() { db.Close() })
 
+	presetPath := os.TempDir() + "/test-presets-" + t.Name() + ".yaml"
+	presetSvc, err := cronpresets.NewService(presetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Remove(presetPath) })
+
 	mockSched := &mockSchedulerService{schedules: make(map[string]*models.Schedule)}
 	cfg := &config.Config{WebHost: "127.0.0.1", WebPort: 0}
 
 	dockerClient, _ := docker.NewClient("unix:///var/run/docker.sock")
-	srv := NewServer(cfg, db, dockerClient, mockSched)
+	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc)
 	return srv, mockSched
 }
 
@@ -276,47 +284,6 @@ func TestAPIListPresets(t *testing.T) {
 	if len(presets) == 0 {
 		t.Error("expected non-empty presets list")
 	}
-
-	foundBuiltin := false
-	for _, p := range presets {
-		if p.Builtin {
-			foundBuiltin = true
-			break
-		}
-	}
-	if !foundBuiltin {
-		t.Error("expected at least one builtin preset")
-	}
-}
-
-func TestAPIListPresetsIncludesCustom(t *testing.T) {
-	srv, _ := setupTestServer(t)
-
-	srv.store.CreateCustomPreset(&models.CronPreset{
-		Label:      "My Preset",
-		Expression: "0 9 * * *",
-		Category:   "Custom",
-	})
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/presets", nil)
-	srv.apiListPresets(w, req)
-
-	var presets []models.CronPreset
-	json.NewDecoder(w.Body).Decode(&presets)
-
-	foundCustom := false
-	for _, p := range presets {
-		if p.Label == "My Preset" {
-			foundCustom = true
-			if p.Builtin {
-				t.Error("custom preset should not be marked as builtin")
-			}
-		}
-	}
-	if !foundCustom {
-		t.Error("expected custom preset in list")
-	}
 }
 
 func TestAPICreateCustomPreset(t *testing.T) {
@@ -376,11 +343,10 @@ func TestAPICreateCustomPresetMissingLabel(t *testing.T) {
 func TestAPIDeleteCustomPreset(t *testing.T) {
 	srv, _ := setupTestServer(t)
 
-	created, _ := srv.store.CreateCustomPreset(&models.CronPreset{
-		Label:      "ToDelete",
-		Expression: "0 8 * * *",
-		Category:   "Custom",
-	})
+	created, err := srv.presetService.Create("ToDelete", "0 8 * * *", "Custom", "")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	r := chi.NewRouter()
 	r.Delete("/api/presets/{id}", srv.apiDeleteCustomPreset)
@@ -391,6 +357,13 @@ func TestAPIDeleteCustomPreset(t *testing.T) {
 
 	if w.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d", w.Code)
+	}
+
+	presets := srv.presetService.List()
+	for _, p := range presets {
+		if p.ID == created.ID {
+			t.Error("preset should have been deleted")
+		}
 	}
 }
 

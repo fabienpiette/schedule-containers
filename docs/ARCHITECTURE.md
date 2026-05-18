@@ -70,7 +70,7 @@ Key files: `config.go`
 
 ### `internal/store/`
 
-SQLite persistence for schedules and custom cron presets. Uses `modernc.org/sqlite` (pure Go, no CGO). The `Open` function runs schema migrations on startup, including a `schema_version` table for future migrations. CRUD operations are straightforward — create, get, list, update, delete, toggle for schedules; create, list, get, delete for custom presets.
+SQLite persistence for schedules. Uses `modernc.org/sqlite` (pure Go, no CGO). The `Open` function runs schema migrations on startup, including a `schema_version` table for future migrations. CRUD operations are straightforward — create, get, list, update, delete, toggle for schedules.
 
 Key files: `store.go`
 
@@ -78,9 +78,9 @@ Key files: `store.go`
 
 ### `internal/cronpresets/`
 
-Built-in cron preset definitions. `Builtins()` returns a `[]models.CronPreset` with common schedules organized by category (Daily, Weekdays, Weekends, Specific Days, Frequent, Monthly). Presets have a `Builtin: true` flag that prevents deletion via the API.
+Cron preset management backed by a YAML file. `Service` loads presets from an embedded `presets.yaml` by default, or from a custom file specified via `PRESETS_PATH`. Create and delete operations persist to the YAML file with a mutex for concurrency safety. If `PRESETS_PATH` is empty, the embedded defaults are used in read-only mode (creates succeed in-memory but don't persist). If `PRESETS_PATH` points to a non-existent file, the embedded defaults are copied to that path.
 
-Key files: `presets.go`
+Key files: `presets.go`, `presets.yaml`
 
 ### `internal/yamlconfig/`
 
@@ -108,7 +108,7 @@ Key files: `scheduler.go`
 
 HTTP server, REST API handlers, and Go templates with HTMX. Chi router for routing, `embed.FS` for templates and static assets baked into the binary. The `SchedulerService` interface decouples the web layer from the concrete `scheduler.Scheduler` type.
 
-API routes include schedule CRUD, container start/stop, cron presets (list builtins + custom, create/delete custom), and YAML import/export. HTML pages include a dashboard, containers view, schedule creation form (with preset dropdowns), and a presets management page for CRUD on custom presets.
+API routes include schedule CRUD, container start/stop, cron presets (list, create, delete), and YAML import/export. HTML pages include a dashboard, containers view, schedule creation form (with preset dropdowns), and a presets management page.
 
 Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go` (HTML rendering), `templates/`, `static/`
 
@@ -117,11 +117,12 @@ Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go
 ## Invariants
 
 - **Dependency direction:** `models` ← `config` ← `store`/`cronpresets` ← `docker` ← `scheduler` ← `yamlconfig` ← `web`/`cli`. No cycles. `store` and `cronpresets` are leaves; they never import from scheduler, web, or docker.
+- **Presets are file-based, not DB-based:** All presets (built-in and custom) live in a YAML file managed by `cronpresets.Service`. No `custom_presets` database table. Create/delete writes directly to the YAML file with mutex protection.
 - **Store is offline-only for CLI:** The `schedule add` CLI command writes to SQLite directly. The running server reads schedules from SQLite on startup. Changes made while the server is running (via API) immediately update the cron runner. CLI-only changes take effect on next server restart.
 - **Per-container serialization:** The scheduler holds a map of `sync.Mutex` per container name. Two cron jobs targeting the same container will never run concurrently — they wait for the mutex.
 - **Cron format:** Always 5-field standard (`min hour day month weekday`), not 6-field with seconds. `ValidateCronExpression` uses `cron.ParseStandard`.
 - **No authentication:** V1 has no auth. The app runs on a private network behind Caddy. Auth is expected to be handled by the reverse proxy.
-- **Single binary:** Templates and static assets are embedded via `//go:embed`. No external files needed at runtime except the SQLite database and Docker socket.
+- **Single binary:** Templates, static assets, and default presets are embedded via `//go:embed`. No external files needed at runtime except the SQLite database, optional presets YAML override, and Docker socket.
 
 ## Cross-Cutting Concerns
 

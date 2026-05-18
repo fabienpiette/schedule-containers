@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/gndm/schedule-containers/internal/config"
+	"github.com/gndm/schedule-containers/internal/cronpresets"
 	"github.com/gndm/schedule-containers/internal/docker"
 	"github.com/gndm/schedule-containers/internal/scheduler"
 	"github.com/gndm/schedule-containers/internal/store"
@@ -61,7 +62,13 @@ var serveCmd = &cobra.Command{
 		sched.Start()
 		slog.Info("scheduler started", "schedules_loaded", len(schedules))
 
-		webSrv := web.NewServer(cfg, db, dockerClient, sched)
+		presetSvc, err := cronpresets.NewService(cfg.PresetsPath)
+		if err != nil {
+			slog.Error("failed to initialize preset service", "error", err)
+			os.Exit(1)
+		}
+
+		webSrv := web.NewServer(cfg, db, dockerClient, sched, presetSvc)
 		go func() {
 			if err := webSrv.Start(); err != nil {
 				slog.Error("web server error", "error", err)

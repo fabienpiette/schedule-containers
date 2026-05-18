@@ -7,20 +7,22 @@ import (
 )
 
 type Config struct {
-	DBPath     string
-	LogLevel   string
-	WebPort    int
-	WebHost    string
-	DockerHost string
+	DBPath      string
+	LogLevel    string
+	WebPort     int
+	WebHost     string
+	DockerHost  string
+	PresetsPath string
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		DBPath:     envOrDefault("DB_PATH", "/data/schedule-containers.db"),
-		LogLevel:   envOrDefault("LOG_LEVEL", "info"),
-		WebPort:    8080,
-		WebHost:    envOrDefault("WEB_HOST", "0.0.0.0"),
-		DockerHost: envOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock"),
+		DBPath:      envOrDefault("DB_PATH", "/data/schedule-containers.db"),
+		LogLevel:    envOrDefault("LOG_LEVEL", "info"),
+		WebPort:     8080,
+		WebHost:     envOrDefault("WEB_HOST", "0.0.0.0"),
+		DockerHost:  envOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock"),
+		PresetsPath: envOrDefault("PRESETS_PATH", ""),
 	}
 
 	if v := os.Getenv("WEB_PORT"); v != "" {

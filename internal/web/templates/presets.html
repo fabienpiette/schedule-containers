@@ -3,33 +3,7 @@
 {{define "content"}}
 <h1>Cron Presets</h1>
 
-<h2>Built-in Presets</h2>
-<table>
-    <thead>
-        <tr>
-            <th>Label</th>
-            <th>Expression</th>
-            <th>Category</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{range .BuiltinPresets}}
-        <tr>
-            <td>{{.Label}}</td>
-            <td><code>{{.Expression}}</code></td>
-            <td>{{.Category}}</td>
-            <td>{{.Description}}</td>
-        </tr>
-        {{else}}
-        <tr><td colspan="4">No built-in presets</td></tr>
-        {{end}}
-    </tbody>
-</table>
-
-<h2>Custom Presets</h2>
-
-{{if .CustomPresets}}
+<h2>Presets</h2>
 <table>
     <thead>
         <tr>
@@ -41,24 +15,23 @@
         </tr>
     </thead>
     <tbody>
-        {{range .CustomPresets}}
+        {{range .Presets}}
         <tr>
             <td>{{.Label}}</td>
             <td><code>{{.Expression}}</code></td>
             <td>{{.Category}}</td>
             <td>{{.Description}}</td>
             <td>
-                <button hx-delete="/api/presets/{{.ID}}" hx-swap="outerHTML" hx-target="closest tr" hx-confirm="Delete preset '{{.Label}}'?">Delete</button>
+                <button hx-delete="/api/presets/{{.ID}}" hx-swap="outerHTML" hx-target="closest tr" hx-confirm="Delete preset '{{.Label}}'?" onclick="setTimeout(function(){location.reload()}, 500)">Delete</button>
             </td>
         </tr>
+        {{else}}
+        <tr><td colspan="5">No presets found</td></tr>
         {{end}}
     </tbody>
 </table>
-{{else}}
-<p>No custom presets yet. Create one below.</p>
-{{end}}
 
-<h2>Create Custom Preset</h2>
+<h2>Create Preset</h2>
 <form id="preset-form">
     <label for="label">Label</label>
     <input type="text" name="label" id="label" placeholder="e.g. Weekdays at 10am" required>

@@ -17,34 +17,6 @@
     <label for="start_preset">Start Cron Preset</label>
     <select id="start_preset">
         <option value="">-- Select a preset or type custom --</option>
-        <optgroup label="Daily">
-            <option value="0 0 * * *">Every day at 00:00</option>
-            <option value="0 6 * * *">Every day at 06:00</option>
-            <option value="0 7 * * *">Every day at 07:00</option>
-            <option value="0 8 * * *">Every day at 08:00</option>
-            <option value="0 9 * * *">Every day at 09:00</option>
-            <option value="0 10 * * *">Every day at 10:00</option>
-            <option value="0 12 * * *">Every day at 12:00</option>
-            <option value="0 18 * * *">Every day at 18:00</option>
-            <option value="0 20 * * *">Every day at 20:00</option>
-            <option value="0 22 * * *">Every day at 22:00</option>
-        </optgroup>
-        <optgroup label="Weekdays">
-            <option value="0 6 * * 1-5">Weekdays at 06:00</option>
-            <option value="0 7 * * 1-5">Weekdays at 07:00</option>
-            <option value="0 8 * * 1-5">Weekdays at 08:00</option>
-            <option value="0 9 * * 1-5">Weekdays at 09:00</option>
-        </optgroup>
-        <optgroup label="Weekends">
-            <option value="0 8 * * 0,6">Weekends at 08:00</option>
-            <option value="0 9 * * 0,6">Weekends at 09:00</option>
-        </optgroup>
-        <optgroup label="Frequent">
-            <option value="0 * * * *">Every hour</option>
-            <option value="0 */2 * * *">Every 2 hours</option>
-            <option value="0 */4 * * *">Every 4 hours</option>
-            <option value="0 */6 * * *">Every 6 hours</option>
-        </optgroup>
     </select>
     <label for="start_cron">Start Cron Expression</label>
     <input type="text" name="start_cron" id="start_cron" placeholder="0 8 * * 1-5" required>
@@ -53,34 +25,6 @@
     <label for="stop_preset">Stop Cron Preset</label>
     <select id="stop_preset">
         <option value="">-- Select a preset or type custom --</option>
-        <optgroup label="Daily">
-            <option value="0 0 * * *">Every day at 00:00</option>
-            <option value="0 6 * * *">Every day at 06:00</option>
-            <option value="0 7 * * *">Every day at 07:00</option>
-            <option value="0 8 * * *">Every day at 08:00</option>
-            <option value="0 9 * * *">Every day at 09:00</option>
-            <option value="0 10 * * *">Every day at 10:00</option>
-            <option value="0 12 * * *">Every day at 12:00</option>
-            <option value="0 18 * * *">Every day at 18:00</option>
-            <option value="0 20 * * *">Every day at 20:00</option>
-            <option value="0 22 * * *">Every day at 22:00</option>
-        </optgroup>
-        <optgroup label="Weekdays">
-            <option value="0 17 * * 1-5">Weekdays at 17:00</option>
-            <option value="0 18 * * 1-5">Weekdays at 18:00</option>
-            <option value="0 19 * * 1-5">Weekdays at 19:00</option>
-            <option value="0 20 * * 1-5">Weekdays at 20:00</option>
-            <option value="0 22 * * 1-5">Weekdays at 22:00</option>
-        </optgroup>
-        <optgroup label="Weekends">
-            <option value="0 22 * * 0,6">Weekends at 22:00</option>
-        </optgroup>
-        <optgroup label="Frequent">
-            <option value="0 * * * *">Every hour</option>
-            <option value="0 */2 * * *">Every 2 hours</option>
-            <option value="0 */4 * * *">Every 4 hours</option>
-            <option value="0 */6 * * *">Every 6 hours</option>
-        </optgroup>
     </select>
     <label for="stop_cron">Stop Cron Expression</label>
     <input type="text" name="stop_cron" id="stop_cron" placeholder="0 18 * * 1-5" required>
@@ -119,7 +63,6 @@ fetch('/api/presets')
                 const group = document.createElement('optgroup');
                 group.label = cat;
                 items.forEach(p => {
-                    if (sel.querySelector('option[value="' + CSS.escape(p.expression) + '"]')) return;
                     const opt = document.createElement('option');
                     opt.value = p.expression;
                     opt.textContent = p.label;

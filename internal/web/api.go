@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/gndm/schedule-containers/internal/cronpresets"
 	"github.com/gndm/schedule-containers/internal/models"
 	"github.com/gndm/schedule-containers/internal/scheduler"
 	"github.com/gndm/schedule-containers/internal/yamlconfig"
@@ -168,19 +167,10 @@ func (s *Server) apiStopContainer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) apiListPresets(w http.ResponseWriter, r *http.Request) {
-	builtins := cronpresets.Builtins()
-	custom, err := s.store.ListCustomPresets()
-	if err != nil {
-		slog.Error("failed to list custom presets", "error", err)
-		custom = nil
-	}
-
-	all := make([]models.CronPreset, len(builtins)+len(custom))
-	copy(all, builtins)
-	copy(all[len(builtins):], custom)
+	presets := s.presetService.List()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(all)
+	json.NewEncoder(w).Encode(presets)
 }
 
 func (s *Server) apiCreateCustomPreset(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +181,6 @@ func (s *Server) apiCreateCustomPreset(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Label = strings.TrimSpace(req.Label)
 	req.Expression = strings.TrimSpace(req.Expression)
-	req.ID = ""
 
 	if req.Label == "" {
 		http.Error(w, "label is required", http.StatusBadRequest)
@@ -201,18 +190,10 @@ func (s *Server) apiCreateCustomPreset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "expression is required", http.StatusBadRequest)
 		return
 	}
-	if err := scheduler.ValidateCronExpression(req.Expression); err != nil {
-		http.Error(w, "invalid cron expression: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	if req.Category == "" {
-		req.Category = "Custom"
-	}
 
-	created, err := s.store.CreateCustomPreset(&req)
+	created, err := s.presetService.Create(req.Label, req.Expression, req.Category, req.Description)
 	if err != nil {
-		slog.Error("failed to create custom preset", "error", err)
-		http.Error(w, "failed to create preset", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -223,7 +204,7 @@ func (s *Server) apiCreateCustomPreset(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiDeleteCustomPreset(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if err := s.store.DeleteCustomPreset(id); err != nil {
+	if err := s.presetService.Delete(id); err != nil {
 		http.Error(w, "preset not found", http.StatusNotFound)
 		return
 	}
