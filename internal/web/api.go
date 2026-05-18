@@ -231,10 +231,28 @@ func (s *Server) apiDeleteCustomPreset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) apiImportSchedules(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "failed to read body", http.StatusBadRequest)
-		return
+	var body []byte
+	contentType := r.Header.Get("Content-Type")
+
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "failed to read file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+		body, err = io.ReadAll(file)
+		if err != nil {
+			http.Error(w, "failed to read file content", http.StatusBadRequest)
+			return
+		}
+	} else {
+		var err error
+		body, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
 	}
 
 	schedules, err := yamlconfig.ToSchedules(body)

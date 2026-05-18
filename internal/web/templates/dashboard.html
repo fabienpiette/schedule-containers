@@ -3,6 +3,13 @@
 {{define "content"}}
 <h1>Dashboard</h1>
 
+<div class="actions-bar">
+    <a href="/schedules" class="button">New Schedule</a>
+    <button id="export-btn" onclick="exportSchedules()">Export YAML</button>
+    <label for="import-file" class="button button-outline">Import YAML</label>
+    <input type="file" id="import-file" accept=".yaml,.yml" style="display:none" onchange="importSchedules(event)">
+</div>
+
 <h2>Schedules</h2>
 <table>
     <thead>
@@ -69,4 +76,40 @@
         {{end}}
     </tbody>
 </table>
+
+<script>
+function exportSchedules() {
+    fetch('/api/export')
+        .then(r => r.blob())
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'schedules.yaml';
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(err => alert('Export failed: ' + err.message));
+}
+
+function importSchedules(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    fetch('/api/import', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => {
+        if (!r.ok) return r.text().then(t => { throw new Error(t); });
+        return r.json();
+    })
+    .then(result => {
+        alert('Imported ' + result.imported + ' of ' + result.total + ' schedules');
+        window.location.reload();
+    })
+    .catch(err => alert('Import failed: ' + err.message));
+}
+</script>
 {{end}}
