@@ -3,26 +3,12 @@
 {{define "content"}}
 <h1>Containers</h1>
 
-{{if .Tags}}
-<div class="bulk-actions">
-    <select id="bulk-tag-select">
-        <option value="">Select a tag...</option>
-        {{range .Tags}}
-        <option value="{{.ID}}">{{.Name}} ({{$.Title}})</option>
-        {{end}}
-    </select>
-    <button onclick="applyTagToSelected()">Apply Tag to Selected</button>
-</div>
-{{end}}
-
-<table>
+<table class="data-table">
     <thead>
         <tr>
-            <th><input type="checkbox" id="select-all" onchange="toggleAll(this)"></th>
             <th>Name</th>
             <th>Image</th>
             <th>State</th>
-            <th>Status</th>
             <th>Stack</th>
             <th>Tag</th>
             <th>Actions</th>
@@ -30,56 +16,65 @@
     </thead>
     <tbody>
         {{range .Containers}}
-        <tr>
-            <td><input type="checkbox" class="container-check" value="{{.Name}}" data-tag="{{.TagName}}"></td>
-            <td>{{.Name}}</td>
-            <td>{{.Image}}</td>
-            <td class="state-{{.State}}">{{.State}}</td>
-            <td>{{.Status}}</td>
-            <td>{{.StackName}}</td>
-            <td>{{if .TagName}}<span class="badge-enabled">{{.TagName}}</span> <button class="btn-remove-tag" hx-delete="/api/tags/{{.TagID}}/containers/{{.Name}}" hx-confirm="Remove tag {{.TagName}} from {{.Name}}?" hx-swap="none" onclick="setTimeout(function(){location.reload()}, 300)">x</button>{{else}}<span class="muted">-</span>{{end}}</td>
+        <tr class="data-row" id="container-{{.Name}}">
+            <td class="cell-name">{{.Name}}</td>
+            <td class="muted">{{.Image}}</td>
+            <td>{{if eq .State "running"}}<span class="badge badge-success">running</span>{{else}}<span class="badge badge-danger">{{.State}}</span>{{end}}</td>
+            <td class="muted">{{.StackName}}</td>
             <td>
-                {{if eq .State "running"}}
-                <button hx-post="/api/containers/{{.Name}}/stop" hx-swap="none" hx-confirm="Stop {{.Name}}?">Stop</button>
+                {{if .TagName}}
+                <span class="badge badge-tag">{{.TagName}}</span>
+                <button class="btn-remove-tag" hx-delete="/api/tags/{{.TagID}}/containers/{{.Name}}" hx-target="closest tr" hx-swap="outerHTML" title="Remove tag">&times;</button>
                 {{else}}
-                <button hx-post="/api/containers/{{.Name}}/start" hx-swap="none" hx-confirm="Start {{.Name}}?">Start</button>
+                <form class="inline-form" onsubmit="assignTag(event, '{{.Name}}')">
+                    <select class="tag-select" data-container="{{.Name}}">
+                        <option value="">Select tag...</option>
+                        {{range $.Tags}}
+                        <option value="{{.ID}}">{{.Name}}</option>
+                        {{end}}
+                    </select>
+                    <button type="submit" class="btn-ghost btn-sm">Apply</button>
+                </form>
+                {{end}}
+            </td>
+            <td class="cell-actions">
+                {{if eq .State "running"}}
+                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Stop</button>
+                {{else}}
+                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Start</button>
                 {{end}}
             </td>
         </tr>
         {{else}}
-        <tr><td colspan="8">No containers found</td></tr>
+        <tr><td colspan="6" class="muted">No containers found</td></tr>
         {{end}}
     </tbody>
 </table>
+{{end}}
 
+{{define "scripts"}}
 <script>
-function toggleAll(source) {
-    document.querySelectorAll('.container-check').forEach(cb => cb.checked = source.checked);
-}
-
-function applyTagToSelected() {
-    const tagId = document.getElementById('bulk-tag-select').value;
-    if (!tagId) { alert('Select a tag first'); return; }
-    const checked = document.querySelectorAll('.container-check:checked');
-    if (checked.length === 0) { alert('Select at least one container'); return; }
-    const containers = Array.from(checked).map(cb => cb.value);
+function assignTag(event, containerName) {
+    event.preventDefault();
+    var form = event.target;
+    var select = form.querySelector('.tag-select');
+    var tagId = select.value;
+    if (!tagId) { showToast('Select a tag first', 'error'); return; }
     fetch('/api/tags/' + tagId + '/containers', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({containers: containers})
-    }).then(r => {
-        if (r.ok) {
-            window.location.reload();
-        } else {
-            r.text().then(t => alert('Error: ' + t));
+        body: JSON.stringify({containers: [containerName]})
+    }).then(function(r) {
+        if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
+        return r.json();
+    }).then(function(result) {
+        var msg = 'Tag applied to ' + (result.created ? result.created.length : 0) + ' container(s)';
+        if (result.skipped && result.skipped.length > 0) {
+            msg += '. ' + result.skipped.length + ' already had this tag.';
         }
-    }).catch(err => alert('Error: ' + err.message));
+        showToast(msg, 'success');
+        setTimeout(function() { location.reload(); }, 1000);
+    }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
 }
 </script>
-
-<style>
-.bulk-actions { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; }
-.muted { color: #999; }
-.btn-remove-tag { background: none; border: none; color: #c00; cursor: pointer; padding: 0 2px; font-weight: bold; font-size: 0.85em; }
-</style>
 {{end}}

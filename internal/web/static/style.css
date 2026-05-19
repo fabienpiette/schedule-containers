@@ -433,6 +433,26 @@ small { color: var(--text-secondary); }
     font-size: 0.85em;
 }
 
+.inline-form {
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.tag-select {
+    padding: 0.2rem 0.4rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 3px;
+    font-size: 0.8rem;
+}
+
+.tag-select:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
 .preset-select { margin-bottom: 0; }
 
 .theme-toggle {
