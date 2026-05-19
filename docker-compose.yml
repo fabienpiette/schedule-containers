@@ -1,6 +1,5 @@
 services:
   schedule-containers:
-    image: ghcr.io/docker/schedule-containers:latest
     build: .
     ports:
       - "${HOST_PORT:-8080}:${WEB_PORT:-8080}"
@@ -11,6 +10,7 @@ services:
       - LOG_LEVEL=info
       - WEB_PORT=${WEB_PORT:-8080}
       - WEB_HOST=0.0.0.0
+      - TZ=${TZ:-Europe/Paris}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - schedule-containers-data:/data

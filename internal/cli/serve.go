@@ -44,7 +44,7 @@ var serveCmd = &cobra.Command{
 		}
 		defer dockerClient.Close()
 
-		sched := scheduler.NewScheduler(dockerClient)
+		sched := scheduler.NewScheduler(dockerClient, cfg.Timezone)
 
 		schedules, err := db.ListSchedules()
 		if err != nil {

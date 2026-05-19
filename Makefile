@@ -51,7 +51,7 @@ docker-build:
 	docker build --no-cache -t $(DOCKER_IMAGE) .
 
 docker-up:
-	docker compose up -d
+	docker compose up -d --build
 
 docker-down:
 	docker compose down

@@ -13,6 +13,7 @@ type Config struct {
 	WebHost     string
 	DockerHost  string
 	PresetsPath string
+	Timezone    string
 }
 
 func Load() (*Config, error) {
@@ -23,6 +24,7 @@ func Load() (*Config, error) {
 		WebHost:     envOrDefault("WEB_HOST", "0.0.0.0"),
 		DockerHost:  envOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock"),
 		PresetsPath: envOrDefault("PRESETS_PATH", ""),
+		Timezone:    envOrDefault("TZ", "UTC"),
 	}
 
 	if v := os.Getenv("WEB_PORT"); v != "" {

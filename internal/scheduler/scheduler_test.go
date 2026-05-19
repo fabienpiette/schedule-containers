@@ -47,7 +47,7 @@ func (m *mockDockerClient) getStopped() []string {
 
 func TestAddSchedule(t *testing.T) {
 	mock := &mockDockerClient{}
-	s := NewScheduler(mock)
+	s := NewScheduler(mock, "UTC")
 
 	sched := &models.Schedule{
 		ID:            "test-1",
@@ -69,7 +69,7 @@ func TestAddSchedule(t *testing.T) {
 
 func TestRemoveSchedule(t *testing.T) {
 	mock := &mockDockerClient{}
-	s := NewScheduler(mock)
+	s := NewScheduler(mock, "UTC")
 
 	sched := &models.Schedule{
 		ID:            "test-1",
@@ -91,7 +91,7 @@ func TestRemoveSchedule(t *testing.T) {
 
 func TestInvalidCronExpression(t *testing.T) {
 	mock := &mockDockerClient{}
-	s := NewScheduler(mock)
+	s := NewScheduler(mock, "UTC")
 
 	sched := &models.Schedule{
 		ID:            "test-1",
@@ -109,7 +109,7 @@ func TestInvalidCronExpression(t *testing.T) {
 
 func TestCronFiresStartStop(t *testing.T) {
 	mock := &mockDockerClient{}
-	s := NewScheduler(mock)
+	s := NewScheduler(mock, "UTC")
 
 	sched := &models.Schedule{
 		ID:            "test-1",
@@ -142,7 +142,7 @@ func TestCronFiresStartStop(t *testing.T) {
 
 func TestDisabledScheduleDoesNotFire(t *testing.T) {
 	mock := &mockDockerClient{}
-	s := NewScheduler(mock)
+	s := NewScheduler(mock, "UTC")
 
 	sched := &models.Schedule{
 		ID:            "test-1",

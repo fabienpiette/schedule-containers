@@ -48,23 +48,38 @@
 </table>
 
 <h2>Containers</h2>
+{{if .Tags}}
+<div class="bulk-actions">
+    <select id="bulk-tag-select">
+        <option value="">Select a tag...</option>
+        {{range .Tags}}
+        <option value="{{.ID}}">{{.Name}}</option>
+        {{end}}
+    </select>
+    <button onclick="applyTagToSelected()">Apply Tag to Selected</button>
+</div>
+{{end}}
 <table>
     <thead>
         <tr>
+            <th><input type="checkbox" id="select-all" onchange="toggleAll(this)"></th>
             <th>Name</th>
             <th>Image</th>
             <th>State</th>
             <th>Stack</th>
+            <th>Tag</th>
             <th>Actions</th>
         </tr>
     </thead>
     <tbody>
         {{range .Containers}}
         <tr>
+            <td><input type="checkbox" class="container-check" value="{{.Name}}" data-tag="{{.TagName}}"></td>
             <td>{{.Name}}</td>
             <td>{{.Image}}</td>
             <td class="state-{{.State}}">{{.State}}</td>
             <td>{{.StackName}}</td>
+            <td>{{if .TagName}}<span class="badge-enabled">{{.TagName}}</span> <button class="btn-remove-tag" hx-delete="/api/tags/{{.TagID}}/containers/{{.Name}}" hx-confirm="Remove tag {{.TagName}} from {{.Name}}?" hx-swap="none" onclick="setTimeout(function(){location.reload()}, 300)">x</button>{{else}}<span class="muted">-</span>{{end}}</td>
             <td>
                 {{if eq .State "running"}}
                 <button hx-post="/api/containers/{{.Name}}/stop" hx-swap="none" hx-confirm="Stop {{.Name}}?">Stop</button>
@@ -74,12 +89,35 @@
             </td>
         </tr>
         {{else}}
-        <tr><td colspan="5">No containers found</td></tr>
+        <tr><td colspan="7">No containers found</td></tr>
         {{end}}
     </tbody>
 </table>
 
 <script>
+function toggleAll(source) {
+    document.querySelectorAll('.container-check').forEach(cb => cb.checked = source.checked);
+}
+
+function applyTagToSelected() {
+    const tagId = document.getElementById('bulk-tag-select').value;
+    if (!tagId) { alert('Select a tag first'); return; }
+    const checked = document.querySelectorAll('.container-check:checked');
+    if (checked.length === 0) { alert('Select at least one container'); return; }
+    const containers = Array.from(checked).map(cb => cb.value);
+    fetch('/api/tags/' + tagId + '/containers', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({containers: containers})
+    }).then(r => {
+        if (r.ok) {
+            window.location.reload();
+        } else {
+            r.text().then(t => alert('Error: ' + t));
+        }
+    }).catch(err => alert('Error: ' + err.message));
+}
+
 function exportSchedules() {
     fetch('/api/export')
         .then(r => r.blob())
@@ -113,5 +151,8 @@ function importSchedules(event) {
     })
     .catch(err => alert('Import failed: ' + err.message));
 }
+.bulk-actions { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; }
+.muted { color: #999; }
+.btn-remove-tag { background: none; border: none; color: #c00; cursor: pointer; padding: 0 2px; font-weight: bold; font-size: 0.85em; }
 </script>
 {{end}}

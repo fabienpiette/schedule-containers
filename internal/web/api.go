@@ -182,21 +182,25 @@ func (s *Server) apiToggleSchedule(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiStartContainer(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
+	slog.Info("manual start container", "container", name)
 	if err := s.docker.StartContainer(r.Context(), name); err != nil {
 		slog.Error("failed to start container", "container", name, "error", err)
 		http.Error(w, "failed to start container", http.StatusInternalServerError)
 		return
 	}
+	slog.Info("started container", "container", name)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) apiStopContainer(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
+	slog.Info("manual stop container", "container", name)
 	if err := s.docker.StopContainer(r.Context(), name); err != nil {
 		slog.Error("failed to stop container", "container", name, "error", err)
 		http.Error(w, "failed to stop container", http.StatusInternalServerError)
 		return
 	}
+	slog.Info("stopped container", "container", name)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -537,6 +541,8 @@ func (s *Server) apiApplyTagToContainers(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	slog.Info("applying tag to containers", "tag", tag.Name, "tag_id", tag.ID, "containers", req.Containers)
+
 	tagID := tag.ID
 	var created []models.Schedule
 	var skipped []string
@@ -544,6 +550,7 @@ func (s *Server) apiApplyTagToContainers(w http.ResponseWriter, r *http.Request)
 	for _, containerName := range req.Containers {
 		existing, _ := s.store.GetScheduleByTagAndContainer(tagID, containerName)
 		if existing != nil {
+			slog.Info("skipping container, already has tag schedule", "container", containerName, "tag", tag.Name)
 			skipped = append(skipped, containerName)
 			continue
 		}
