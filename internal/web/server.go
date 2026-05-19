@@ -139,6 +139,7 @@ func (s *Server) renderPage(w http.ResponseWriter, name string, data any) {
 	}
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
 		slog.Error("failed to render page", "name", name, "error", err)
+		return
 	}
 }
 
