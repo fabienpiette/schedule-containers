@@ -17,6 +17,7 @@ import (
 	"github.com/gndm/schedule-containers/internal/cronpresets"
 	"github.com/gndm/schedule-containers/internal/docker"
 	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/gndm/schedule-containers/internal/scheduler"
 	"github.com/gndm/schedule-containers/internal/store"
 )
 
@@ -37,6 +38,8 @@ type Server struct {
 
 //go:embed templates/* static/*
 var embeddedFS embed.FS
+
+var _ SchedulerService = (*scheduler.Scheduler)(nil)
 
 func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service) *Server {
 	baseFiles := []string{
@@ -125,6 +128,18 @@ func (s *Server) renderPartial(w http.ResponseWriter, name string, data any) {
 	}
 	slog.Error("partial template not found", "name", name)
 	http.Error(w, "template not found", http.StatusInternalServerError)
+}
+
+func (s *Server) renderPage(w http.ResponseWriter, name string, data any) {
+	t, ok := s.templates[name]
+	if !ok {
+		slog.Error("page template not found", "name", name)
+		http.Error(w, "template not found", http.StatusInternalServerError)
+		return
+	}
+	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
+		slog.Error("failed to render page", "name", name, "error", err)
+	}
 }
 
 func (s *Server) respondNoContent(w http.ResponseWriter, r *http.Request, toastMsg string) {

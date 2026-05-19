@@ -147,7 +147,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		TagsCount:      len(tags),
 	}
 
-	s.templates["dashboard.html"].ExecuteTemplate(w, "layout", data)
+	s.renderPage(w, "dashboard.html", data)
 }
 
 func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
@@ -202,7 +202,7 @@ func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 		Tags:       tagOptions,
 	}
 
-	s.templates["containers.html"].ExecuteTemplate(w, "layout", data)
+	s.renderPage(w, "containers.html", data)
 }
 
 func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
@@ -250,7 +250,7 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 		Schedules:  scheduleViews,
 	}
 
-	s.templates["schedules.html"].ExecuteTemplate(w, "layout", data)
+	s.renderPage(w, "schedules.html", data)
 }
 
 func (s *Server) handlePresets(w http.ResponseWriter, r *http.Request) {
@@ -275,7 +275,7 @@ func (s *Server) handlePresets(w http.ResponseWriter, r *http.Request) {
 		Presets: presetViews,
 	}
 
-	s.templates["presets.html"].ExecuteTemplate(w, "layout", data)
+	s.renderPage(w, "presets.html", data)
 }
 
 func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
@@ -319,5 +319,5 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 		ContainerStates: containerStates,
 	}
 
-	s.templates["tags.html"].ExecuteTemplate(w, "layout", data)
+	s.renderPage(w, "tags.html", data)
 }
