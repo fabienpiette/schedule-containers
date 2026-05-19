@@ -4,77 +4,64 @@
 <h1>Dashboard</h1>
 
 <div class="actions-bar">
-    <a href="/schedules" class="button">New Schedule</a>
-    <button id="export-btn" onclick="exportSchedules()">Export YAML</button>
-    <label for="import-file" class="button button-outline">Import YAML</label>
+    <a href="/schedules" class="btn-primary">+ New Schedule</a>
+    <button class="btn-secondary" onclick="exportSchedules()">Export YAML</button>
+    <label for="import-file" class="btn-secondary">Import YAML</label>
     <input type="file" id="import-file" accept=".yaml,.yml" style="display:none" onchange="importSchedules(event)">
 </div>
 
+<div class="stat-cards">
+    <div class="stat-card">
+        <div class="stat-label">Running</div>
+        <div class="stat-value stat-success">{{.RunningCount}}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Stopped</div>
+        <div class="stat-value stat-danger">{{.StoppedCount}}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Schedules</div>
+        <div class="stat-value">{{.SchedulesCount}}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Tags</div>
+        <div class="stat-value">{{.TagsCount}}</div>
+    </div>
+</div>
+
 <h2>Schedules</h2>
-<table>
+<table class="data-table">
     <thead>
         <tr>
             <th>Container</th>
             <th>Stack</th>
-            <th>Start Cron</th>
-            <th>Stop Cron</th>
+            <th>Schedule</th>
             <th>Tag</th>
-            <th>Enabled</th>
+            <th>Status</th>
             <th>Actions</th>
         </tr>
     </thead>
     <tbody>
         {{range .Schedules}}
-        <tr>
-            <td>{{.DisplayName}}</td>
-            <td>{{.StackName}}</td>
-            <td><code>{{.StartCron}}</code></td>
-            <td><code>{{.StopCron}}</code></td>
-            <td>{{if .TagName}}<a href="/tags">{{.TagName}}</a>{{end}}</td>
-            <td>
-                {{if .Enabled}}<span class="badge-enabled">Enabled</span>{{else}}<span class="badge-disabled">Disabled</span>{{end}}
-            </td>
-            <td>
-                <button hx-post="/api/schedules/{{.ID}}/toggle" hx-swap="outerHTML" hx-target="closest tr">
-                    {{if .Enabled}}Disable{{else}}Enable{{end}}
-                </button>
-                <button hx-delete="/api/schedules/{{.ID}}" hx-swap="outerHTML" hx-target="closest tr" hx-confirm="Delete this schedule?">Delete</button>
+        <tr class="data-row" id="schedule-{{.ID}}">
+            <td class="cell-name">{{.DisplayName}}</td>
+            <td class="muted">{{.StackName}}</td>
+            <td><span class="cron">{{.StartCron}}</span> <span class="arrow">&rarr;</span> <span class="cron">{{.StopCron}}</span></td>
+            <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}</span>{{else}}<span class="muted">-</span>{{end}}</td>
+            <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
+            <td class="cell-actions">
+                <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+                <button class="btn-danger-text btn-sm" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}',{target:'#schedule-{{.ID}}',swap:'outerHTML'})})">Delete</button>
             </td>
         </tr>
         {{else}}
-        <tr><td colspan="7">No schedules configured</td></tr>
+        <tr><td colspan="6" class="muted">No schedules configured</td></tr>
         {{end}}
     </tbody>
 </table>
 
-<h2>Tags</h2>
-{{if .Tags}}
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Start Cron</th>
-            <th>Stop Cron</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{range .Tags}}
-        <tr>
-            <td><a href="/tags">{{.Name}}</a></td>
-            <td><code>{{.StartCron}}</code></td>
-            <td><code>{{.StopCron}}</code></td>
-            <td>{{if .Enabled}}<span class="badge-enabled">Enabled</span>{{else}}<span class="badge-disabled">Disabled</span>{{end}}</td>
-        </tr>
-        {{end}}
-    </tbody>
-</table>
-{{else}}
-<p>No tags configured. <a href="/tags">Create one</a>.</p>
-{{end}}
-
-<h2>Containers</h2>
 <h2>Scheduled Containers</h2>
+<table class="data-table">
     <thead>
         <tr>
             <th>Name</th>
@@ -87,65 +74,61 @@
     </thead>
     <tbody>
         {{range .Containers}}
-        <tr>
-            <td>{{.Name}}</td>
-            <td>{{.Image}}</td>
-            <td class="state-{{.State}}">{{.State}}</td>
-            <td>{{.StackName}}</td>
-            <td>{{if .TagName}}<span class="badge-enabled">{{.TagName}}</span> <button class="btn-remove-tag" hx-delete="/api/tags/{{.TagID}}/containers/{{.Name}}" hx-confirm="Remove tag {{.TagName}} from {{.Name}}?" hx-swap="none" onclick="setTimeout(function(){location.reload()}, 300)">x</button>{{else}}<span class="muted">-</span>{{end}}</td>
-            <td>
-                {{if eq .State "running"}}
-                <button hx-post="/api/containers/{{.Name}}/stop" hx-swap="none" hx-confirm="Stop {{.Name}}?">Stop</button>
-                {{else}}
-                <button hx-post="/api/containers/{{.Name}}/start" hx-swap="none" hx-confirm="Start {{.Name}}?">Start</button>
-                {{end}}
+        <tr class="data-row" id="container-{{.Name}}">
+            <td class="cell-name">{{.Name}}</td>
+            <td class="muted">{{.Image}}</td>
+            <td>{{if eq .State "running"}}<span class="badge badge-success">Running</span>{{else}}<span class="badge badge-danger">{{.State}}</span>{{end}}</td>
+            <td class="muted">{{.StackName}}</td>
+            <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}<button class="btn-remove-tag" onclick="htmx.ajax('DELETE','/api/tags/{{.TagID}}/containers/{{.Name}}',{target:'#container-{{.Name}}',swap:'outerHTML'})">&times;</button></span>{{else}}<span class="muted">-</span>{{end}}</td>
+            <td class="cell-actions">
+                {{if eq .State "running"}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Stop</button>{{else}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Start</button>{{end}}
             </td>
         </tr>
         {{else}}
-        <tr><td colspan="7">No containers found</td></tr>
+        <tr><td colspan="6" class="muted">No scheduled containers found</td></tr>
         {{end}}
     </tbody>
 </table>
+{{end}}
 
+{{define "scripts"}}
 <script>
 function exportSchedules() {
     fetch('/api/export')
-        .then(r => r.blob())
-        .then(blob => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
+        .then(function(r) {
+            if (!r.ok) throw new Error('Export failed');
+            return r.blob();
+        })
+        .then(function(blob) {
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
             a.href = url;
             a.download = 'schedules.yaml';
             a.click();
             URL.revokeObjectURL(url);
+            showToast('Schedules exported');
         })
-        .catch(err => alert('Export failed: ' + err.message));
+        .catch(function(err) { showToast(err.message, 'error'); });
 }
 
 function importSchedules(event) {
-    const file = event.target.files[0];
+    var file = event.target.files[0];
     if (!file) return;
-    const formData = new FormData();
+    var formData = new FormData();
     formData.append('file', file);
     fetch('/api/import', {
         method: 'POST',
         body: formData
     })
-    .then(r => {
-        if (!r.ok) return r.text().then(t => { throw new Error(t); });
+    .then(function(r) {
+        if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
         return r.json();
     })
-    .then(result => {
-        alert('Imported ' + result.imported + ' of ' + result.total + ' schedules');
-        window.location.reload();
+    .then(function(result) {
+        showToast('Imported ' + result.imported + ' of ' + result.total + ' schedules');
+        setTimeout(function() { location.reload(); }, 500);
     })
-    .catch(err => alert('Import failed: ' + err.message));
+    .catch(function(err) { showToast(err.message, 'error'); });
 }
 </script>
-
-<style>
-.bulk-actions { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; }
-.muted { color: #999; }
-.btn-remove-tag { background: none; border: none; color: #c00; cursor: pointer; padding: 0 2px; font-weight: bold; font-size: 0.85em; }
-</style>
 {{end}}

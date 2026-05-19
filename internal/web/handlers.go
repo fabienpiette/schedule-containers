@@ -5,10 +5,14 @@ import (
 )
 
 type DashboardData struct {
-	Title      string
-	Schedules  []ScheduleView
-	Containers []ContainerView
-	Tags       []TagView
+	Title          string
+	Schedules      []ScheduleView
+	Containers     []ContainerView
+	Tags           []TagView
+	RunningCount   int
+	StoppedCount   int
+	SchedulesCount int
+	TagsCount      int
 }
 
 type ScheduleView struct {
@@ -122,11 +126,25 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	runningCount := 0
+	stoppedCount := 0
+	for _, c := range containerViews {
+		if c.State == "running" {
+			runningCount++
+		} else {
+			stoppedCount++
+		}
+	}
+
 	data := DashboardData{
-		Title:      "Dashboard",
-		Schedules:  scheduleViews,
-		Containers: containerViews,
-		Tags:       tagViews,
+		Title:          "Dashboard",
+		Schedules:      scheduleViews,
+		Containers:     containerViews,
+		Tags:           tagViews,
+		RunningCount:   runningCount,
+		StoppedCount:   stoppedCount,
+		SchedulesCount: len(schedules),
+		TagsCount:      len(tags),
 	}
 
 	s.templates["dashboard.html"].ExecuteTemplate(w, "layout", data)
