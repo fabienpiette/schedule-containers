@@ -5,15 +5,15 @@ If you want to familiarize yourself with the codebase, you are in the right plac
 
 ## Bird's Eye View
 
-Schedule Containers is a single Go binary that keeps Docker containers running on a schedule. You define cron expressions for when a container should start and stop, and the scheduler ensures those actions happen at the right time. Tags allow you to define a schedule template (start/stop cron) and apply it to multiple containers at once. It also provides a web dashboard and REST API for managing schedules, tags, and manually controlling containers.
+Schedule Containers is a single Go binary that keeps Docker containers running on a schedule. You define cron expressions for when a container should start and stop, and the scheduler ensures those actions happen at the right time. Tags let you define a schedule template (start/stop cron) and apply it to multiple containers at once. A web dashboard and REST API provide management; a CLI handles offline operations and YAML import/export.
 
-The runtime flow is straightforward: on startup, the `serve` command loads persisted schedules and tags from SQLite, registers them with an in-process cron runner, and starts an HTTP server. When a cron job fires, the scheduler calls the Docker API to start or stop the target container. The web dashboard and REST API let you create, toggle, and delete schedules and tags which dynamically add or remove cron jobs.
+On startup, the `serve` command loads persisted schedules and tags from SQLite, registers them with an in-process cron runner, and starts an HTTP server. When a cron job fires, the scheduler calls the Docker API to start or stop the target container. The web dashboard and REST API create, toggle, and delete schedules and tags, which dynamically add or remove cron jobs in the running scheduler. YAML import/export lets you back up and restore all schedules and tags as a file.
 
 ```
                     ┌─────────────────────┐
                     │   CLI (cobra)        │
                     │  serve / schedule /   │
-                    │  containers           │
+                    │  containers / tag     │
                     └──────────┬───────────┘
                                │
                     ┌──────────▼───────────┐
@@ -38,7 +38,7 @@ The runtime flow is straightforward: on startup, the `serve` command loads persi
                     └────────┬────────┘
                              │
                     ┌────────▼────────┐
-                    │  Docker socket   │
+                    │  Docker socket  │
                     └─────────────────┘
 ```
 
@@ -50,7 +50,7 @@ Entry point. Minimal `main.go` that delegates to `internal/cli`. Nothing interes
 
 ### `internal/cli/`
 
-CLI commands backed by Cobra. `serve.go` is the most important file — it wires together the store, Docker client, scheduler, and web server. `schedule.go` and `tag.go` are thin wrappers over the store for offline operations.
+CLI commands backed by Cobra. `serve.go` is the most important file — it wires together the store, Docker client, scheduler, preset service, and web server. `schedule.go` and `tag.go` are thin wrappers over the store for offline operations.
 
 Key files: `serve.go`, `schedule.go`, `tag.go`
 
@@ -70,7 +70,7 @@ Key files: `config.go`
 
 ### `internal/store/`
 
-SQLite persistence for schedules and tags. Uses `modernc.org/sqlite` (pure Go, no CGO). The `Open` function runs schema migrations on startup with a `schema_version` table for versioned migrations. CRUD operations cover schedules (create, get, list, update, delete, toggle) and tags (create, get, list, update, delete). `DeleteTag` cascades to delete all schedules with the matching `tag_id`. A unique index on `(tag_id, container_name)` prevents duplicate schedules for the same tag+container.
+SQLite persistence for schedules and tags. Uses `modernc.org/sqlite` (pure Go, no CGO). `Open` runs schema migrations on startup with a `schema_version` table for versioned migrations. CRUD operations cover schedules and tags. `DeleteTag` cascades to delete all schedules with the matching `tag_id`. A unique index on `(tag_id, container_name)` prevents duplicate schedules for the same tag+container.
 
 Key files: `store.go`
 
@@ -128,10 +128,11 @@ Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go
 ## Cross-Cutting Concerns
 
 - **Error handling:** Errors are logged with `slog` and returned to the caller. The scheduler logs and continues on container start/stop failures — no retries, since the cron job will fire again.
-- **Logging:** Structured JSON via `log/slog`. Levels: `DEBUG` (container discovery), `INFO` (schedule fires), `WARN` (missing containers, invalid cron), `ERROR` (Docker API failures). Configured via `LOG_LEVEL` env var.
+- **Logging:** Structured text via `log/slog`. Levels: `DEBUG` (container discovery), `INFO` (schedule fires), `WARN` (missing containers, invalid cron), `ERROR` (Docker API failures). Configured via `LOG_LEVEL` env var, default `info`.
 - **Configuration:** All via environment variables with defaults. No config files. See `internal/config/config.go`.
-- **Testing:** Unit tests with mocked dependencies for store and scheduler. Docker client uses a transformation function (`transformContainers`) that's unit-testable without a Docker daemon. Web handlers tested with `httptest`.
-- **Database migrations:** Run automatically on startup in `store.Open()`. A `schema_version` table tracks the version. Phase 2 fields will be added via migration.
+- **Testing:** Unit tests with mocked dependencies for store, scheduler, and web handlers. Docker client uses a transformation function (`transformContainers`) that's unit-testable without a Docker daemon. Web handlers tested with `httptest`.
+- **Concurrency:** The scheduler serializes actions per container using `sync.Mutex`. The preset service uses a mutex for YAML file writes. The store uses SQLite's built-in serialization for concurrent reads/writes from the same process.
+- **Database migrations:** Run automatically on startup in `store.Open()`. A `schema_version` table tracks the version. New fields are added via migration.
 
 ## A Typical Change
 
