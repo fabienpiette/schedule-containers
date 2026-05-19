@@ -1,24 +1,95 @@
 {{define "layout"}}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - Schedule Containers</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <script>
+        (function(){
+            var t=localStorage.getItem('theme');
+            if(!t){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';}
+            document.documentElement.setAttribute('data-theme',t);
+        })();
+    </script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
-    <nav>
-        <a href="/">Dashboard</a>
-        <a href="/containers">Containers</a>
-        <a href="/schedules">New Schedule</a>
-        <a href="/tags">Tags</a>
-        <a href="/presets">Presets</a>
+    <nav class="nav">
+        <a href="/" class="nav-brand">
+            <svg class="nav-logo" width="22" height="18" viewBox="0 0 22 18" fill="none">
+                <path d="M11 0v4H9V0h2zm4 1v3h-2V1h2zM7 1v3H5V1h2zm12 5c0-1.1-.9-2-2-2h-1c0-2.2-1.8-4-4-4H6C3.8 0 2 1.8 2 4H1C-.1 4-1 4.9-1 6v1h22V6c0-1.1-.9-2-2-2zm-2 3H1v3c0 2.2 1.8 4 4 4h10c2.2 0 4-1.8 4-4V9z" fill="currentColor"/>
+            </svg>
+            schedule-containers
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link{{if eq .Title "Dashboard"}} active{{end}}">Dashboard</a>
+            <a href="/schedules" class="nav-link{{if eq .Title "Schedules"}} active{{end}}">Schedules</a>
+            <a href="/tags" class="nav-link{{if eq .Title "Tags"}} active{{end}}">Tags</a>
+            <a href="/containers" class="nav-link{{if eq .Title "Containers"}} active{{end}}">Containers</a>
+            <a href="/presets" class="nav-link{{if eq .Title "Presets"}} active{{end}}">Presets</a>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+            <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 018 2v6h6z" fill="currentColor"/><path d="M8 2a6 6 0 106 6H8V2z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+        </button>
     </nav>
     <main>
         {{template "content" .}}
     </main>
+    <div id="toast-container" class="toast-container"></div>
+    <div id="confirm-dialog" class="dialog-overlay" style="display:none;">
+        <div class="dialog-card">
+            <h3 class="dialog-title" id="confirm-title">Confirm</h3>
+            <p class="dialog-message" id="confirm-message"></p>
+            <div class="dialog-actions">
+                <button class="btn-ghost" onclick="closeConfirm()">Cancel</button>
+                <button class="btn-danger" id="confirm-action">Delete</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        function toggleTheme(){
+            var html=document.documentElement;
+            var current=html.getAttribute('data-theme');
+            var next=current==='dark'?'light':'dark';
+            html.setAttribute('data-theme',next);
+            localStorage.setItem('theme',next);
+        }
+        function showToast(message,type){
+            type=type||'success';
+            var container=document.getElementById('toast-container');
+            var toast=document.createElement('div');
+            toast.className='toast toast-'+type;
+            toast.textContent=message;
+            container.appendChild(toast);
+            setTimeout(function(){toast.classList.add('toast-exit');},2700);
+            setTimeout(function(){if(toast.parentNode)toast.parentNode.removeChild(toast);},3000);
+        }
+        function showConfirm(title,message,onConfirm){
+            document.getElementById('confirm-title').textContent=title;
+            document.getElementById('confirm-message').textContent=message;
+            document.getElementById('confirm-dialog').style.display='flex';
+            var btn=document.getElementById('confirm-action');
+            btn.onclick=function(){onConfirm();closeConfirm();};
+        }
+        function closeConfirm(){
+            document.getElementById('confirm-dialog').style.display='none';
+        }
+        document.body.addEventListener('htmx:afterRequest',function(evt){
+            if(evt.detail&&evt.detail.xhr){
+                var msg=evt.detail.xhr.getResponseHeader('X-Toast-Message');
+                if(msg)showToast(decodeURIComponent(msg),evt.detail.xhr.status>=400?'error':'success');
+            }
+        });
+    </script>
+    {{template "scripts" .}}
 </body>
 </html>
 {{end}}
+
+{{define "scripts"}}{{end}}
