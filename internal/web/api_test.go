@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
@@ -80,7 +81,7 @@ func TestAPIListSchedules(t *testing.T) {
 		StopCron:      "0 18 * * *",
 		Enabled:       true,
 	}
-	srv.store.CreateSchedule(sched)
+	srv.store.CreateSchedule(context.Background(), sched)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/schedules", nil)
@@ -139,7 +140,7 @@ func TestAPIDeleteSchedule(t *testing.T) {
 		StopCron:      "0 18 * * *",
 		Enabled:       true,
 	}
-	created, _ := srv.store.CreateSchedule(sched)
+	created, _ := srv.store.CreateSchedule(context.Background(), sched)
 
 	r := chi.NewRouter()
 	r.Delete("/api/schedules/{id}", srv.apiDeleteSchedule)
@@ -165,7 +166,7 @@ func TestAPIToggleSchedule(t *testing.T) {
 		StopCron:      "0 18 * * *",
 		Enabled:       true,
 	}
-	created, _ := srv.store.CreateSchedule(sched)
+	created, _ := srv.store.CreateSchedule(context.Background(), sched)
 
 	r := chi.NewRouter()
 	r.Post("/api/schedules/{id}/toggle", srv.apiToggleSchedule)
@@ -194,7 +195,7 @@ func TestAPIUpdateSchedule(t *testing.T) {
 		StopCron:      "0 18 * * *",
 		Enabled:       true,
 	}
-	created, _ := srv.store.CreateSchedule(sched)
+	created, _ := srv.store.CreateSchedule(context.Background(), sched)
 
 	body := `{"container_name":"my-app","start_cron":"0 9 * * *","stop_cron":"0 19 * * *","enabled":true}`
 	r := chi.NewRouter()
@@ -370,7 +371,7 @@ func TestAPIDeleteCustomPreset(t *testing.T) {
 func TestAPIExportSchedules(t *testing.T) {
 	srv, _ := setupTestServer(t)
 
-	srv.store.CreateSchedule(&models.Schedule{
+	srv.store.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "My App",
 		StartCron:     "0 8 * * *",
@@ -572,7 +573,7 @@ func TestAPICreateTagDuplicateName(t *testing.T) {
 func TestAPIGetTag(t *testing.T) {
 	srv, _ := setupTestServer(t)
 
-	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := srv.store.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 
 	r := chi.NewRouter()
 	r.Get("/api/tags/{id}", srv.apiGetTag)
@@ -589,7 +590,7 @@ func TestAPIGetTag(t *testing.T) {
 func TestAPIUpdateTag(t *testing.T) {
 	srv, _ := setupTestServer(t)
 
-	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := srv.store.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 
 	body := `{"name":"test","start_cron":"0 9 * * *","stop_cron":"0 18 * * *","enabled":true}`
 	r := chi.NewRouter()
@@ -614,9 +615,9 @@ func TestAPIUpdateTag(t *testing.T) {
 func TestAPIDeleteTag(t *testing.T) {
 	srv, mockSched := setupTestServer(t)
 
-	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := srv.store.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 	tagID := tag.ID
-	sched, _ := srv.store.CreateSchedule(&models.Schedule{
+	sched, _ := srv.store.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 8 * * *",
@@ -637,7 +638,7 @@ func TestAPIDeleteTag(t *testing.T) {
 		t.Errorf("expected 204, got %d", w.Code)
 	}
 
-	schedules, _ := srv.store.ListSchedules()
+	schedules, _ := srv.store.ListSchedules(context.Background())
 	for _, s := range schedules {
 		if s.ID == sched.ID {
 			t.Error("tag-derived schedule should have been deleted")
@@ -651,9 +652,9 @@ func TestAPIDeleteTag(t *testing.T) {
 func TestAPIToggleTag(t *testing.T) {
 	srv, _ := setupTestServer(t)
 
-	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := srv.store.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 	tagID := tag.ID
-	srv.store.CreateSchedule(&models.Schedule{
+	srv.store.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 8 * * *",
@@ -679,7 +680,7 @@ func TestAPIToggleTag(t *testing.T) {
 		t.Errorf("expected tag Enabled=false after toggle, got %v", toggled.Enabled)
 	}
 
-	schedules, _ := srv.store.ListSchedulesByTag(tag.ID)
+	schedules, _ := srv.store.ListSchedulesByTag(context.Background(), tag.ID)
 	for _, s := range schedules {
 		if s.Enabled != false {
 			t.Errorf("expected schedule Enabled=false after tag toggle, got %v", s.Enabled)
@@ -690,7 +691,7 @@ func TestAPIToggleTag(t *testing.T) {
 func TestAPIApplyTagToContainers(t *testing.T) {
 	srv, _ := setupTestServer(t)
 
-	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := srv.store.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 
 	r := chi.NewRouter()
 	r.Post("/api/tags/{id}/containers", srv.apiApplyTagToContainers)
@@ -705,7 +706,7 @@ func TestAPIApplyTagToContainers(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", w.Code, w.Body.String())
 	}
 
-	schedules, _ := srv.store.ListSchedulesByTag(tag.ID)
+	schedules, _ := srv.store.ListSchedulesByTag(context.Background(), tag.ID)
 	if len(schedules) != 2 {
 		t.Errorf("expected 2 schedules for tag, got %d", len(schedules))
 	}
@@ -714,9 +715,9 @@ func TestAPIApplyTagToContainers(t *testing.T) {
 func TestAPIRemoveTagFromContainer(t *testing.T) {
 	srv, _ := setupTestServer(t)
 
-	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := srv.store.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 	tagID := tag.ID
-	srv.store.CreateSchedule(&models.Schedule{
+	srv.store.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 8 * * *",
@@ -736,7 +737,7 @@ func TestAPIRemoveTagFromContainer(t *testing.T) {
 		t.Errorf("expected 204, got %d", w.Code)
 	}
 
-	schedules, _ := srv.store.ListSchedulesByTag(tag.ID)
+	schedules, _ := srv.store.ListSchedulesByTag(context.Background(), tag.ID)
 	if len(schedules) != 0 {
 		t.Errorf("expected 0 schedules for tag after removal, got %d", len(schedules))
 	}
@@ -745,9 +746,9 @@ func TestAPIRemoveTagFromContainer(t *testing.T) {
 func TestAPIUpdateScheduleRejectsCronChangeForTagSchedule(t *testing.T) {
 	srv, _ := setupTestServer(t)
 
-	tag, _ := srv.store.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := srv.store.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 	tagID := tag.ID
-	created, _ := srv.store.CreateSchedule(&models.Schedule{
+	created, _ := srv.store.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 8 * * *",

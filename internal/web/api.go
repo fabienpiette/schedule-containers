@@ -34,7 +34,7 @@ func (s *Server) apiListContainers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) apiListSchedules(w http.ResponseWriter, r *http.Request) {
-	schedules, err := s.store.ListSchedules()
+	schedules, err := s.store.ListSchedules(r.Context())
 	if err != nil {
 		slog.Error("failed to list schedules", "error", err)
 		http.Error(w, "failed to list schedules", http.StatusInternalServerError)
@@ -46,22 +46,23 @@ func (s *Server) apiListSchedules(w http.ResponseWriter, r *http.Request) {
 		TagName string `json:"tag_name,omitempty"`
 	}
 
+	ctx := r.Context()
 	tagCache := make(map[string]string)
 	resp := make([]scheduleResponse, len(schedules))
 	for i, sched := range schedules {
-		r := scheduleResponse{Schedule: sched}
+		sr := scheduleResponse{Schedule: sched}
 		if sched.TagID != nil {
 			name, ok := tagCache[*sched.TagID]
 			if !ok {
-				tag, err := s.store.GetTag(*sched.TagID)
+				tag, err := s.store.GetTag(ctx, *sched.TagID)
 				if err == nil {
 					name = tag.Name
 					tagCache[*sched.TagID] = name
 				}
 			}
-			r.TagName = name
+			sr.TagName = name
 		}
-		resp[i] = r
+		resp[i] = sr
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -92,7 +93,7 @@ func (s *Server) apiCreateSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := s.store.CreateSchedule(&req)
+	created, err := s.store.CreateSchedule(r.Context(), &req)
 	if err != nil {
 		slog.Error("failed to create schedule", "error", err)
 		http.Error(w, "failed to create schedule", http.StatusInternalServerError)
@@ -113,7 +114,7 @@ func (s *Server) apiCreateSchedule(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	existing, err := s.store.GetSchedule(id)
+	existing, err := s.store.GetSchedule(r.Context(), id)
 	if err != nil {
 		http.Error(w, "schedule not found", http.StatusNotFound)
 		return
@@ -134,7 +135,7 @@ func (s *Server) apiUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := s.store.UpdateSchedule(&req)
+	updated, err := s.store.UpdateSchedule(r.Context(), &req)
 	if err != nil {
 		slog.Error("failed to update schedule", "error", err)
 		http.Error(w, "failed to update schedule", http.StatusInternalServerError)
@@ -155,7 +156,7 @@ func (s *Server) apiUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiDeleteSchedule(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	if err := s.store.DeleteSchedule(id); err != nil {
+	if err := s.store.DeleteSchedule(r.Context(), id); err != nil {
 		http.Error(w, "schedule not found", http.StatusNotFound)
 		return
 	}
@@ -167,7 +168,7 @@ func (s *Server) apiDeleteSchedule(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiToggleSchedule(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	toggled, err := s.store.ToggleSchedule(id)
+	toggled, err := s.store.ToggleSchedule(r.Context(), id)
 	if err != nil {
 		http.Error(w, "schedule not found", http.StatusNotFound)
 		return
@@ -183,7 +184,7 @@ func (s *Server) apiToggleSchedule(w http.ResponseWriter, r *http.Request) {
 	if wantsHTML(r) {
 		tagName := ""
 		if toggled.TagID != nil {
-			tag, err := s.store.GetTag(*toggled.TagID)
+			tag, err := s.store.GetTag(r.Context(), *toggled.TagID)
 			if err == nil {
 				tagName = tag.Name
 			}
@@ -309,7 +310,7 @@ func (s *Server) apiImportSchedules(w http.ResponseWriter, r *http.Request) {
 
 	created := 0
 	for _, sched := range schedules {
-		if _, err := s.store.CreateSchedule(&sched); err != nil {
+		if _, err := s.store.CreateSchedule(r.Context(), &sched); err != nil {
 			slog.Error("failed to import schedule", "container", sched.ContainerName, "error", err)
 			continue
 		}
@@ -323,7 +324,7 @@ func (s *Server) apiImportSchedules(w http.ResponseWriter, r *http.Request) {
 
 	tagsCreated := 0
 	for _, tag := range tags {
-		if _, err := s.store.CreateTag(&tag); err != nil {
+		if _, err := s.store.CreateTag(r.Context(), &tag); err != nil {
 			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 				slog.Warn("skipping existing tag during import", "name", tag.Name)
 				continue
@@ -339,14 +340,14 @@ func (s *Server) apiImportSchedules(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) apiExportSchedules(w http.ResponseWriter, r *http.Request) {
-	schedules, err := s.store.ListSchedules()
+	schedules, err := s.store.ListSchedules(r.Context())
 	if err != nil {
 		slog.Error("failed to list schedules", "error", err)
 		http.Error(w, "failed to list schedules", http.StatusInternalServerError)
 		return
 	}
 
-	tags, err := s.store.ListTags()
+	tags, err := s.store.ListTags(r.Context())
 	if err != nil {
 		slog.Error("failed to list tags", "error", err)
 		http.Error(w, "failed to list tags", http.StatusInternalServerError)
@@ -361,7 +362,7 @@ func (s *Server) apiExportSchedules(w http.ResponseWriter, r *http.Request) {
 // --- Tag API handlers ---
 
 func (s *Server) apiListTags(w http.ResponseWriter, r *http.Request) {
-	tags, err := s.store.ListTags()
+	tags, err := s.store.ListTags(r.Context())
 	if err != nil {
 		slog.Error("failed to list tags", "error", err)
 		http.Error(w, "failed to list tags", http.StatusInternalServerError)
@@ -395,7 +396,7 @@ func (s *Server) apiCreateTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := s.store.CreateTag(&req)
+	created, err := s.store.CreateTag(r.Context(), &req)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			http.Error(w, "tag name already exists", http.StatusConflict)
@@ -413,12 +414,12 @@ func (s *Server) apiCreateTag(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiGetTag(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	tag, err := s.store.GetTag(id)
+	tag, err := s.store.GetTag(r.Context(), id)
 	if err != nil {
 		http.Error(w, "tag not found", http.StatusNotFound)
 		return
 	}
-	schedules, _ := s.store.ListSchedulesByTag(id)
+	schedules, _ := s.store.ListSchedulesByTag(r.Context(), id)
 
 	type tagDetail struct {
 		models.Tag
@@ -431,7 +432,7 @@ func (s *Server) apiGetTag(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiUpdateTag(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	existing, err := s.store.GetTag(id)
+	existing, err := s.store.GetTag(r.Context(), id)
 	if err != nil {
 		http.Error(w, "tag not found", http.StatusNotFound)
 		return
@@ -464,7 +465,7 @@ func (s *Server) apiUpdateTag(w http.ResponseWriter, r *http.Request) {
 
 	cronChanged := req.StartCron != existing.StartCron || req.StopCron != existing.StopCron
 
-	updated, err := s.store.UpdateTag(&req)
+	updated, err := s.store.UpdateTag(r.Context(), &req)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			http.Error(w, "tag name already exists", http.StatusConflict)
@@ -476,11 +477,11 @@ func (s *Server) apiUpdateTag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if cronChanged {
-		schedules, _ := s.store.ListSchedulesByTag(id)
+		schedules, _ := s.store.ListSchedulesByTag(r.Context(), id)
 		for _, sched := range schedules {
 			sched.StartCron = updated.StartCron
 			sched.StopCron = updated.StopCron
-			updatedSched, err := s.store.UpdateSchedule(&sched)
+			updatedSched, err := s.store.UpdateSchedule(r.Context(), &sched)
 			if err != nil {
 				slog.Warn("failed to update tag schedule cron", "schedule_id", sched.ID, "error", err)
 				continue
@@ -501,12 +502,12 @@ func (s *Server) apiUpdateTag(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiDeleteTag(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	schedules, _ := s.store.ListSchedulesByTag(id)
+	schedules, _ := s.store.ListSchedulesByTag(r.Context(), id)
 	for _, sched := range schedules {
 		s.scheduler.RemoveSchedule(sched.ID)
 	}
 
-	if err := s.store.DeleteTag(id); err != nil {
+	if err := s.store.DeleteTag(r.Context(), id); err != nil {
 		http.Error(w, "tag not found", http.StatusNotFound)
 		return
 	}
@@ -516,24 +517,24 @@ func (s *Server) apiDeleteTag(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiToggleTag(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	tag, err := s.store.GetTag(id)
+	tag, err := s.store.GetTag(r.Context(), id)
 	if err != nil {
 		http.Error(w, "tag not found", http.StatusNotFound)
 		return
 	}
 
 	tag.Enabled = !tag.Enabled
-	updated, err := s.store.UpdateTag(tag)
+	updated, err := s.store.UpdateTag(r.Context(), tag)
 	if err != nil {
 		slog.Error("failed to toggle tag", "error", err)
 		http.Error(w, "failed to toggle tag", http.StatusInternalServerError)
 		return
 	}
 
-	schedules, _ := s.store.ListSchedulesByTag(id)
+	schedules, _ := s.store.ListSchedulesByTag(r.Context(), id)
 	for _, sched := range schedules {
 		sched.Enabled = updated.Enabled
-		updatedSched, err := s.store.UpdateSchedule(&sched)
+		updatedSched, err := s.store.UpdateSchedule(r.Context(), &sched)
 		if err != nil {
 			slog.Warn("failed to update schedule enabled state", "schedule_id", sched.ID, "error", err)
 			continue
@@ -547,7 +548,7 @@ func (s *Server) apiToggleTag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if wantsHTML(r) {
-		tagSchedules, err := s.store.ListSchedulesByTag(updated.ID)
+		tagSchedules, err := s.store.ListSchedulesByTag(r.Context(), updated.ID)
 		if err != nil {
 			slog.Warn("failed to list schedules for tag partial", "tag_id", updated.ID, "error", err)
 		}
@@ -570,7 +571,7 @@ func (s *Server) apiToggleTag(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiApplyTagToContainers(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	tag, err := s.store.GetTag(id)
+	tag, err := s.store.GetTag(r.Context(), id)
 	if err != nil {
 		http.Error(w, "tag not found", http.StatusNotFound)
 		return
@@ -593,7 +594,7 @@ func (s *Server) apiApplyTagToContainers(w http.ResponseWriter, r *http.Request)
 	var skipped []string
 
 	for _, containerName := range req.Containers {
-		existing, _ := s.store.GetScheduleByTagAndContainer(tagID, containerName)
+		existing, _ := s.store.GetScheduleByTagAndContainer(r.Context(), tagID, containerName)
 		if existing != nil {
 			slog.Info("skipping container, already has tag schedule", "container", containerName, "tag", tag.Name)
 			skipped = append(skipped, containerName)
@@ -611,7 +612,7 @@ func (s *Server) apiApplyTagToContainers(w http.ResponseWriter, r *http.Request)
 			OnDemandURL:     "",
 			IdleTimeoutSec:  0,
 		}
-		createdSched, err := s.store.CreateSchedule(sched)
+		createdSched, err := s.store.CreateSchedule(r.Context(), sched)
 		if err != nil {
 			slog.Error("failed to create schedule for container", "container", containerName, "error", err)
 			continue
@@ -635,13 +636,13 @@ func (s *Server) apiRemoveTagFromContainer(w http.ResponseWriter, r *http.Reques
 	id := chi.URLParam(r, "id")
 	containerName := chi.URLParam(r, "name")
 
-	sched, err := s.store.GetScheduleByTagAndContainer(id, containerName)
+	sched, err := s.store.GetScheduleByTagAndContainer(r.Context(), id, containerName)
 	if err != nil {
 		http.Error(w, "no schedule found for this tag and container", http.StatusNotFound)
 		return
 	}
 
-	if err := s.store.DeleteSchedule(sched.ID); err != nil {
+	if err := s.store.DeleteSchedule(r.Context(), sched.ID); err != nil {
 		slog.Error("failed to delete schedule", "error", err)
 		http.Error(w, "failed to delete schedule", http.StatusInternalServerError)
 		return

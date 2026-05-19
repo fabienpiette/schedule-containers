@@ -57,11 +57,11 @@ type TagView struct {
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	schedules, _ := s.store.ListSchedules()
+	schedules, _ := s.store.ListSchedules(r.Context())
 	containers, _ := s.docker.ListContainers(r.Context())
 
 	tagCache := make(map[string]string)
-	tags, _ := s.store.ListTags()
+	tags, _ := s.store.ListTags(r.Context())
 	for _, tag := range tags {
 		tagCache[tag.ID] = tag.Name
 	}
@@ -152,8 +152,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 	containers, _ := s.docker.ListContainers(r.Context())
-	schedules, _ := s.store.ListSchedules()
-	tags, _ := s.store.ListTags()
+	schedules, _ := s.store.ListSchedules(r.Context())
+	tags, _ := s.store.ListTags(r.Context())
 
 	tagCache := make(map[string]string)
 	for _, tag := range tags {
@@ -207,8 +207,8 @@ func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 	containers, _ := s.docker.ListContainers(r.Context())
-	schedules, _ := s.store.ListSchedules()
-	tags, _ := s.store.ListTags()
+	schedules, _ := s.store.ListSchedules(r.Context())
+	tags, _ := s.store.ListTags(r.Context())
 
 	tagCache := make(map[string]string)
 	for _, tag := range tags {
@@ -279,7 +279,7 @@ func (s *Server) handlePresets(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
-	tags, _ := s.store.ListTags()
+	tags, _ := s.store.ListTags(r.Context())
 	containers, _ := s.docker.ListContainers(r.Context())
 
 	containerNames := make([]string, len(containers))
@@ -291,7 +291,7 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 
 	tagViews := make([]TagView, len(tags))
 	for i, tag := range tags {
-		schedules, _ := s.store.ListSchedulesByTag(tag.ID)
+		schedules, _ := s.store.ListSchedulesByTag(r.Context(), tag.ID)
 		tagContainers := make([]string, len(schedules))
 		for j, sched := range schedules {
 			tagContainers[j] = sched.ContainerName
