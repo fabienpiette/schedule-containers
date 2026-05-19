@@ -4,27 +4,31 @@
 <h1>Tags</h1>
 
 <form id="tag-form">
+<div class="form-group">
     <label for="name">Name</label>
-    <input type="text" name="name" id="name" placeholder="e.g. business-hours" required>
+    <input type="text" name="name" id="name" class="form-input" placeholder="e.g. business-hours" required>
 
     <label for="start_preset">Start Cron Preset</label>
-    <select id="start_preset">
+    <select id="start_preset" class="form-select">
         <option value="">-- Select a preset or type custom --</option>
     </select>
     <label for="start_cron">Start Cron Expression</label>
-    <input type="text" name="start_cron" id="start_cron" placeholder="0 8 * * 1-5" required>
+    <input type="text" name="start_cron" id="start_cron" class="form-input" placeholder="0 8 * * 1-5" required>
     <small>Standard 5-field format: min hour day month weekday</small>
 
     <label for="stop_preset">Stop Cron Preset</label>
-    <select id="stop_preset">
+    <select id="stop_preset" class="form-select">
         <option value="">-- Select a preset or type custom --</option>
     </select>
     <label for="stop_cron">Stop Cron Expression</label>
-    <input type="text" name="stop_cron" id="stop_cron" placeholder="0 18 * * 1-5" required>
+    <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5" required>
     <small>Standard 5-field format: min hour day month weekday</small>
 
     <button type="submit" class="btn-primary">Create Tag</button>
+</div>
 </form>
+
+<h2>Tags</h2>
 
 {{if .Tags}}
 <table class="data-table">

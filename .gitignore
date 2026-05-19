@@ -6,3 +6,4 @@ coverage.html
 .env
 vendor/
 *.test
+tmp/
