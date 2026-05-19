@@ -24,7 +24,7 @@
             <td>
                 {{if .TagName}}
                 <span class="badge badge-tag">{{.TagName}}</span>
-                <button class="btn-remove-tag" hx-delete="/api/tags/{{.TagID}}/containers/{{.Name}}" hx-swap="none" title="Remove tag">&times;</button>
+                <button class="btn-remove-tag" hx-delete="/api/tags/{{.TagID}}/containers/{{.Name}}" hx-target="closest tr" hx-swap="outerHTML" title="Remove tag">&times;</button>
                 {{else}}
                 <form class="inline-form" onsubmit="assignTag(event, '{{.Name}}')">
                     <select class="tag-select" data-container="{{.Name}}">
@@ -39,9 +39,9 @@
             </td>
             <td class="cell-actions">
                 {{if eq .State "running"}}
-                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-swap="none">Stop</button>
+                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Stop</button>
                 {{else}}
-                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-swap="none">Start</button>
+                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Start</button>
                 {{end}}
             </td>
         </tr>
@@ -56,24 +56,19 @@
 <script>
 function assignTag(event, containerName) {
     event.preventDefault();
-    var form = event.target;
-    var select = form.querySelector('.tag-select');
+    var select = event.target.querySelector('.tag-select');
     var tagId = select.value;
     if (!tagId) { showToast('Select a tag first', 'error'); return; }
     fetch('/api/tags/' + tagId + '/containers', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'Accept': 'text/html'},
         body: JSON.stringify({containers: [containerName]})
     }).then(function(r) {
         if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-        return r.json();
-    }).then(function(result) {
-        var msg = 'Tag applied to ' + (result.created ? result.created.length : 0) + ' container(s)';
-        if (result.skipped && result.skipped.length > 0) {
-            msg += '. ' + result.skipped.length + ' already had this tag.';
-        }
-        showToast(msg, 'success');
-        setTimeout(function() { location.reload(); }, 1000);
+        return r.text();
+    }).then(function(html) {
+        var row = document.getElementById('container-' + containerName);
+        if (row) row.outerHTML = html;
     }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
 }
 </script>
