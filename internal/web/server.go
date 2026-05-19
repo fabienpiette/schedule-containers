@@ -117,19 +117,6 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	return srv
 }
 
-func (s *Server) renderPartial(w http.ResponseWriter, name string, data any) {
-	for _, t := range s.templates {
-		if t.Lookup(name) != nil {
-			if err := t.ExecuteTemplate(w, name, data); err != nil {
-				slog.Error("failed to render partial", "name", name, "error", err)
-			}
-			return
-		}
-	}
-	slog.Error("partial template not found", "name", name)
-	http.Error(w, "template not found", http.StatusInternalServerError)
-}
-
 func (s *Server) renderPage(w http.ResponseWriter, name string, data any) {
 	t, ok := s.templates[name]
 	if !ok {
@@ -141,15 +128,6 @@ func (s *Server) renderPage(w http.ResponseWriter, name string, data any) {
 		slog.Error("failed to render page", "name", name, "error", err)
 		return
 	}
-}
-
-func (s *Server) respondNoContent(w http.ResponseWriter, r *http.Request, toastMsg string) {
-	if wantsHTML(r) {
-		w.Header().Set("X-Toast-Message", toastMsg)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) Start() error {

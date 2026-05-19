@@ -18,10 +18,6 @@ type applyRequest struct {
 	Containers []string `json:"containers"`
 }
 
-func wantsHTML(r *http.Request) bool {
-	return strings.Contains(r.Header.Get("Accept"), "text/html")
-}
-
 func (s *Server) apiListContainers(w http.ResponseWriter, r *http.Request) {
 	containers, err := s.docker.ListContainers(r.Context())
 	if err != nil {
