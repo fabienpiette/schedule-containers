@@ -24,7 +24,7 @@
             <td>
                 {{if .TagName}}
                 <span class="badge badge-tag">{{.TagName}}</span>
-                <button class="btn-remove-tag" hx-delete="/api/tags/{{.TagID}}/containers/{{.Name}}" hx-target="closest tr" hx-swap="outerHTML" title="Remove tag">&times;</button>
+                <button class="btn-remove-tag" hx-delete="/api/tags/{{.TagID}}/containers/{{.Name}}" hx-swap="none" title="Remove tag">&times;</button>
                 {{else}}
                 <form class="inline-form" onsubmit="assignTag(event, '{{.Name}}')">
                     <select class="tag-select" data-container="{{.Name}}">
@@ -39,9 +39,9 @@
             </td>
             <td class="cell-actions">
                 {{if eq .State "running"}}
-                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Stop</button>
+                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-swap="none">Stop</button>
                 {{else}}
-                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Start</button>
+                <button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-swap="none">Start</button>
                 {{end}}
             </td>
         </tr>

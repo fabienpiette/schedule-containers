@@ -305,7 +305,8 @@ main {
 }
 
 .form-input,
-.form-select {
+.form-select,
+.tag-select {
     padding: 0.5rem;
     background: var(--bg-surface);
     border: 1px solid var(--border);
@@ -315,7 +316,8 @@ main {
 }
 
 .form-input:focus,
-.form-select:focus {
+.form-select:focus,
+.tag-select:focus {
     border-color: var(--accent);
     outline: none;
 }
@@ -441,16 +443,8 @@ small { color: var(--text-secondary); }
 
 .tag-select {
     padding: 0.2rem 0.4rem;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
     border-radius: 3px;
     font-size: 0.8rem;
-}
-
-.tag-select:focus {
-    border-color: var(--accent);
-    outline: none;
 }
 
 .preset-select { margin-bottom: 0; }

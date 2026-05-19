@@ -32,9 +32,9 @@
     <td class="muted">{{.Image}}</td>
     <td>{{if eq .State "running"}}<span class="badge badge-success">Running</span>{{else}}<span class="badge badge-danger">{{.State}}</span>{{end}}</td>
     <td class="muted">{{.StackName}}</td>
-    <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}<button class="btn-remove-tag" onclick="htmx.ajax('DELETE','/api/tags/{{.TagID}}/containers/{{.Name}}',{target:'#container-{{.Name}}',swap:'outerHTML'})">&times;</button></span>{{else}}<span class="muted">-</span>{{end}}</td>
+    <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}<button class="btn-remove-tag" onclick="htmx.ajax('DELETE','/api/tags/{{.TagID}}/containers/{{.Name}}',{swap:'none'})">&times;</button></span>{{else}}<span class="muted">-</span>{{end}}</td>
     <td class="cell-actions">
-        {{if eq .State "running"}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Stop</button>{{else}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Start</button>{{end}}
+        {{if eq .State "running"}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-swap="none">Stop</button>{{else}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-swap="none">Start</button>{{end}}
     </td>
 </tr>
 {{end}}

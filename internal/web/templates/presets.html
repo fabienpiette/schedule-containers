@@ -23,7 +23,7 @@
             <td class="muted">{{.Description}}</td>
             <td class="cell-actions">
                 {{if eq .Category "Custom"}}
-                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Preset','Delete preset \'{{.Label}}\'?',function(){htmx.ajax('DELETE','/api/presets/{{.ID}}',{target:'#preset-{{.ID}}',swap:'outerHTML'});showToast('Preset deleted');})">Delete</button>
+                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Preset','Delete preset \'{{.Label}}\'?',function(){htmx.ajax('DELETE','/api/presets/{{.ID}}',{target:'#preset-{{.ID}}',swap:'outerHTML'})})">Delete</button>
                 {{else}}
                 <span class="muted">Embedded</span>
                 {{end}}
