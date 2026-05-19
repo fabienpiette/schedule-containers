@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/gndm/schedule-containers/internal/models"
 )
 
 func TestTransformContainers(t *testing.T) {
@@ -52,5 +53,28 @@ func TestTransformContainersStripsSlash(t *testing.T) {
 	result := transformContainers(input)
 	if result[0].Name != "test" {
 		t.Errorf("expected slash stripped, got %s", result[0].Name)
+	}
+}
+
+func TestFindContainer(t *testing.T) {
+	containers := []models.Container{
+		{ID: "abc123def456", Name: "app1", Image: "nginx:latest", State: "running", StackName: "web"},
+		{ID: "xyz789ghi012", Name: "app2", Image: "redis:7", State: "exited", StackName: ""},
+	}
+
+	got, err := findContainer(containers, "app1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Name != "app1" {
+		t.Errorf("expected app1, got %s", got.Name)
+	}
+	if got.State != "running" {
+		t.Errorf("expected running, got %s", got.State)
+	}
+
+	_, err = findContainer(containers, "nonexistent")
+	if err == nil {
+		t.Error("expected error for missing container, got nil")
 	}
 }

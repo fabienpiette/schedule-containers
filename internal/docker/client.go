@@ -74,3 +74,20 @@ func transformContainers(containers []container.Summary) []models.Container {
 	}
 	return result
 }
+
+func findContainer(containers []models.Container, name string) (*models.Container, error) {
+	for i := range containers {
+		if containers[i].Name == name {
+			return &containers[i], nil
+		}
+	}
+	return nil, fmt.Errorf("container %s not found", name)
+}
+
+func (c *Client) GetContainer(ctx context.Context, name string) (*models.Container, error) {
+	containers, err := c.ListContainers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return findContainer(containers, name)
+}
