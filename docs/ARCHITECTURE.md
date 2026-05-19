@@ -84,7 +84,7 @@ Key files: `presets.go`, `presets.yaml`
 
 ### `internal/yamlconfig/`
 
-YAML import/export for schedules and tags. `FromSchedulesAndTags` serializes schedules and tags to YAML bytes, grouping tag-derived schedules under their tag. `ToSchedulesAndTags` parses YAML into schedule and tag models. `FromSchedules` is a convenience wrapper for schedules-only export.
+YAML import/export for schedules and tags. `FromSchedulesAndTags` serializes schedules and tags to YAML bytes, grouping tag-derived schedules under their tag. `ToSchedulesAndTags` parses YAML into schedule and tag models.
 
 Key files: `config.go`
 
@@ -106,11 +106,9 @@ Key files: `scheduler.go`
 
 ### `internal/web/`
 
-HTTP server, REST API handlers, and Go templates with HTMX. Chi router for routing, `embed.FS` for templates and static assets baked into the binary. The `SchedulerService` interface decouples the web layer from the concrete `scheduler.Scheduler` type.
+HTTP server, REST API, and Go templates with HTMX. Chi router for routing, `embed.FS` for templates and static assets baked into the binary. CSS custom properties drive dark/light theming (dark default, toggle persisted in `localStorage`). Routes serve both JSON and HTML: `wantsHTML` in `api.go` checks the `Accept` header and branches to `renderPartial` for HTMX requests or full page renders for browser navigation. The web layer depends on a `SchedulerService` interface, not the concrete `scheduler.Scheduler` type.
 
-API routes include schedule CRUD, container start/stop, cron presets (list, create, delete), tag CRUD with container management and toggle, and YAML import/export. HTML pages include a dashboard, containers view, schedule creation form (with preset dropdowns), presets management page, and tags page.
-
-Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go` (HTML rendering), `templates/`, `static/`
+Key files: `server.go` (routing, setup), `api.go` (JSON endpoints + HTMX content negotiation), `handlers.go` (HTML rendering), `templates/`, `static/`
 
 **Architecture Invariant:** The web layer depends on `scheduler.SchedulerService` (interface), not `scheduler.Scheduler` (concrete). This allows testing with a mock scheduler.
 
@@ -122,7 +120,7 @@ Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go
 - **Store is offline-only for CLI:** The `schedule add` CLI command writes to SQLite directly. The running server reads schedules from SQLite on startup. Changes made while the server is running (via API) immediately update the cron runner. CLI-only changes take effect on next server restart.
 - **Per-container serialization:** The scheduler holds a map of `sync.Mutex` per container name. Two cron jobs targeting the same container will never run concurrently — they wait for the mutex.
 - **Cron format:** Always 5-field standard (`min hour day month weekday`), not 6-field with seconds. `ValidateCronExpression` uses `cron.ParseStandard`.
-- **No authentication:** V1 has no auth. The app runs on a private network behind Caddy. Auth is expected to be handled by the reverse proxy.
+- **No authentication:** V1 has no auth. The app runs on a private network behind a reverse proxy.
 - **Single binary:** Templates, static assets, and default presets are embedded via `//go:embed`. No external files needed at runtime except the SQLite database, optional presets YAML override, and Docker socket.
 
 ## Cross-Cutting Concerns
@@ -132,7 +130,7 @@ Key files: `server.go` (routing, setup), `api.go` (JSON endpoints), `handlers.go
 - **Configuration:** All via environment variables with defaults. No config files. See `internal/config/config.go`.
 - **Testing:** Unit tests with mocked dependencies for store, scheduler, and web handlers. Docker client uses a transformation function (`transformContainers`) that's unit-testable without a Docker daemon. Web handlers tested with `httptest`.
 - **Concurrency:** The scheduler serializes actions per container using `sync.Mutex`. The preset service uses a mutex for YAML file writes. The store uses SQLite's built-in serialization for concurrent reads/writes from the same process.
-- **Database migrations:** Run automatically on startup in `store.Open()`. A `schema_version` table tracks the version. New fields are added via migration.
+- **Database migrations:** Run automatically on startup in `store.Open()`. A `schema_version` table tracks the version. New columns are added via migration steps — never edit existing steps.
 
 ## A Typical Change
 

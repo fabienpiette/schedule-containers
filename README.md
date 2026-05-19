@@ -13,12 +13,12 @@ docker compose up -d
 
 ## Features
 
-- **Cron scheduling** — Start and stop containers on any cron expression (`0 8 * * 1-5` = weekdays at 8am)
-- **Tags** — Define schedule templates, apply to multiple containers at once
-- **Web dashboard** — Go templates + HTMX, single binary, no JS build step
-- **REST API** — Full CRUD for schedules, tags, presets, import/export, container start/stop
-- **YAML import/export** — Backup and restore schedules as YAML
-- **Per-container locking** — Prevents race conditions when concurrent cron jobs target the same container
+- **Cron scheduling** — Start and stop containers on any 5-field cron expression (`0 8 * * 1-5` = weekdays at 8am)
+- **Tags** — Reusable schedule templates applied to multiple containers at once
+- **Web dashboard** — Go templates + HTMX with dark/light theme, inline actions, toast notifications
+- **REST API** — Full CRUD for schedules, tags, presets; container start/stop; YAML import/export
+- **Per-container locking** — Concurrent cron jobs targeting the same container are serialized
+- **Single binary** — Templates, static assets, and default presets embedded via `//go:embed`
 
 ## Install
 
@@ -45,39 +45,28 @@ make build
 ### CLI
 
 ```bash
-# Start the server (web dashboard + scheduler)
-schedule-containers serve
-
-# Add a schedule (start weekdays 8am, stop 6pm)
-schedule-containers schedule add my-app "0 8 * * 1-5" "0 18 * * 1-5"
-
-# Tags — reusable schedule templates
+schedule-containers serve                                          # Start server + scheduler
+schedule-containers schedule add my-app "0 8 * * 1-5" "0 18 * * 1-5"  # Add schedule
 schedule-containers tag add business-hours --start "0 8 * * 1-5" --stop "0 18 * * 1-5"
 schedule-containers tag apply business-hours --containers my-app,redis
-
-# Export and import schedules as YAML
-schedule-containers schedule export schedules.yaml
-schedule-containers schedule import schedules.yaml --dry-run
+schedule-containers schedule export schedules.yaml                 # Export
+schedule-containers schedule import schedules.yaml --dry-run        # Import (dry-run)
 ```
 
 ### API
 
 ```bash
-# Create a schedule
 curl -X POST http://localhost:8080/api/schedules \
   -H "Content-Type: application/json" \
   -d '{"container_name":"my-app","start_cron":"0 8 * * 1-5","stop_cron":"0 18 * * 1-5","enabled":true}'
 
-# Start a container now
 curl -X POST http://localhost:8080/api/containers/my-app/start
-
-# Export schedules and tags as YAML
 curl http://localhost:8080/api/export -o config.yaml
 ```
 
 ### Dashboard
 
-Open `http://localhost:8080` — view containers, manage schedules, start/stop containers, create and apply tags, export/import YAML.
+Open `http://localhost:8080` — view containers, manage schedules, start/stop containers, create and apply tags.
 
 For all options: `schedule-containers --help`
 
@@ -90,13 +79,13 @@ For all options: `schedule-containers --help`
 | `WEB_PORT` | `8080` | Web server port |
 | `WEB_HOST` | `0.0.0.0` | Web server bind address |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
-| `PRESETS_PATH` | *(empty — uses embedded)* | Path to custom presets YAML; if set and file doesn't exist, embedded defaults are copied to it |
+| `PRESETS_PATH` | *(empty — uses embedded)* | Custom presets YAML; if set and file doesn't exist, embedded defaults are copied to it |
 
 ## Known Issues
 
-- No authentication — designed for private networks behind a reverse proxy (Caddy, Nginx)
-- Docker socket access grants full container control; consider `tecnativa/docker-socket-proxy` for restricted access
-- CLI `schedule add` writes to the database directly; a running server picks up changes on restart
+- **No authentication** — designed for private networks behind a reverse proxy (Caddy, Nginx)
+- **Docker socket access** — grants full container control; consider `tecnativa/docker-socket-proxy` for restricted access
+- **CLI doesn't hot-reload** — `schedule add` writes directly to SQLite; a running server picks up changes on restart
 
 ## Documentation
 
@@ -104,8 +93,8 @@ For all options: `schedule-containers --help`
 
 ## Contributing
 
-Contributions welcome — open an issue or pull request. See [Architecture](docs/ARCHITECTURE.md) for codebase orientation.
+Contributions welcome — open an issue or pull request. See [Architecture](docs/ARCHITECTURE.md) for codebase orientation and the [CLAUDE.md](CLAUDE.md) for development commands.
 
 ## License
 
-[MIT](LICENSE)
+MIT
