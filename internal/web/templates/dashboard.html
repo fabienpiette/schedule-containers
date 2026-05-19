@@ -3,12 +3,7 @@
 {{define "content"}}
 <h1>Dashboard</h1>
 
-<div class="actions-bar">
-    <a href="/schedules" class="btn-primary">+ New Schedule</a>
-    <button class="btn-secondary" onclick="exportSchedules()">Export YAML</button>
-    <label for="import-file" class="btn-secondary">Import YAML</label>
-    <input type="file" id="import-file" accept=".yaml,.yml" style="display:none" onchange="importSchedules(event)">
-</div>
+
 
 <div class="stat-cards">
     <div class="stat-card">
@@ -89,46 +84,4 @@
         {{end}}
     </tbody>
 </table>
-{{end}}
-
-{{define "scripts"}}
-<script>
-function exportSchedules() {
-    fetch('/api/export')
-        .then(function(r) {
-            if (!r.ok) throw new Error('Export failed');
-            return r.blob();
-        })
-        .then(function(blob) {
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'schedules.yaml';
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('Schedules exported');
-        })
-        .catch(function(err) { showToast(err.message, 'error'); });
-}
-
-function importSchedules(event) {
-    var file = event.target.files[0];
-    if (!file) return;
-    var formData = new FormData();
-    formData.append('file', file);
-    fetch('/api/import', {
-        method: 'POST',
-        body: formData
-    })
-    .then(function(r) {
-        if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-        return r.json();
-    })
-    .then(function(result) {
-        showToast('Imported ' + result.imported + ' of ' + result.total + ' schedules');
-        setTimeout(function() { location.reload(); }, 500);
-    })
-    .catch(function(err) { showToast(err.message, 'error'); });
-}
-</script>
 {{end}}
