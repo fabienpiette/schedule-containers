@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <script>
         (function(){
             var t=localStorage.getItem('theme');
@@ -21,8 +22,15 @@
 <body>
     <nav class="nav">
         <a href="/" class="nav-brand">
-            <svg class="nav-logo" width="22" height="18" viewBox="0 0 22 18" fill="none">
-                <path d="M11 0v4H9V0h2zm4 1v3h-2V1h2zM7 1v3H5V1h2zm12 5c0-1.1-.9-2-2-2h-1c0-2.2-1.8-4-4-4H6C3.8 0 2 1.8 2 4H1C-.1 4-1 4.9-1 6v1h22V6c0-1.1-.9-2-2-2zm-2 3H1v3c0 2.2 1.8 4 4 4h10c2.2 0 4-1.8 4-4V9z" fill="currentColor"/>
+            <svg class="nav-logo" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <!-- Container body -->
+                <rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <!-- Lid cap -->
+                <path d="M8 7V5.5A1.5 1.5 0 019.5 4h5A1.5 1.5 0 0116 5.5V7" stroke="currentColor" stroke-width="1.5"/>
+                <!-- Clock face -->
+                <circle cx="12" cy="14" r="4" stroke="currentColor" stroke-width="1.4"/>
+                <!-- Clock hands: minute at 12, hour at 3 -->
+                <path d="M12 11v3h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             schedule-containers
         </a>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark background tile -->
+  <rect width="32" height="32" rx="7" fill="#112240"/>
+  <!-- Container body -->
+  <rect x="5" y="10" width="22" height="17" rx="3" fill="#1D63ED"/>
+  <!-- Lid cap (narrower, lighter, sits above body) -->
+  <rect x="10" y="5" width="12" height="7" rx="2" fill="#3a7aed"/>
+  <!-- Clock face -->
+  <circle cx="16" cy="18.5" r="5.5" fill="white"/>
+  <!-- Clock hands: minute up (12), hour right (3) -->
+  <path d="M16 15v3.5h3" stroke="#112240" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
