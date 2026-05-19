@@ -283,8 +283,10 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 	containers, _ := s.docker.ListContainers(r.Context())
 
 	containerNames := make([]string, len(containers))
+	containerStates := make(map[string]string)
 	for i, c := range containers {
 		containerNames[i] = c.Name
+		containerStates[c.Name] = c.State
 	}
 
 	tagViews := make([]TagView, len(tags))
@@ -306,13 +308,15 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Title      string
-		Tags       []TagView
-		Containers []string
+		Title           string
+		Tags            []TagView
+		Containers      []string
+		ContainerStates map[string]string
 	}{
-		Title:      "Tags",
-		Tags:       tagViews,
-		Containers: containerNames,
+		Title:           "Tags",
+		Tags:            tagViews,
+		Containers:      containerNames,
+		ContainerStates: containerStates,
 	}
 
 	s.templates["tags.html"].ExecuteTemplate(w, "layout", data)

@@ -3,7 +3,6 @@
 {{define "content"}}
 <h1>Tags</h1>
 
-<h2>Create Tag</h2>
 <form id="tag-form">
     <label for="name">Name</label>
     <input type="text" name="name" id="name" placeholder="e.g. business-hours" required>
@@ -24,12 +23,11 @@
     <input type="text" name="stop_cron" id="stop_cron" placeholder="0 18 * * 1-5" required>
     <small>Standard 5-field format: min hour day month weekday</small>
 
-    <button type="submit">Create Tag</button>
+    <button type="submit" class="btn-primary">Create Tag</button>
 </form>
 
 {{if .Tags}}
-<h2>All Tags</h2>
-<table>
+<table class="data-table">
     <thead>
         <tr>
             <th>Name</th>
@@ -42,33 +40,53 @@
     </thead>
     <tbody>
         {{range .Tags}}
-        <tr>
-            <td><strong>{{.Name}}</strong></td>
-            <td><code>{{.StartCron}}</code></td>
-            <td><code>{{.StopCron}}</code></td>
+        <tr class="data-row" id="tag-{{.ID}}">
+            <td class="cell-name">{{.Name}}</td>
+            <td><span class="cron">{{.StartCron}}</span></td>
+            <td><span class="cron">{{.StopCron}}</span></td>
+            <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
             <td>
-                {{if .Enabled}}<span class="badge-enabled">Enabled</span>{{else}}<span class="badge-disabled">Disabled</span>{{end}}
+                <button class="btn-ghost btn-sm" onclick="toggleTagContainers('{{.ID}}')">{{.ContainerCount}} containers</button>
             </td>
-            <td>
-                {{if .Containers}}
-                    {{range $i, $c := .Containers}}{{if $i}}, {{end}}{{$c}}{{end}}
-                {{else}}
-                    <span class="muted">None</span>
-                {{end}}
+            <td class="cell-actions">
+                <button class="btn-ghost btn-sm" hx-post="/api/tags/{{.ID}}/toggle" hx-target="#tag-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Tag','Delete tag \'{{.Name}}\' and all its schedules?',function(){htmx.ajax('DELETE','/api/tags/{{.ID}}',{target:'#tag-{{.ID}}',swap:'outerHTML'})})">Delete</button>
             </td>
-            <td>
-                <button hx-post="/api/tags/{{.ID}}/toggle" hx-swap="outerHTML" hx-target="closest tr" hx-confirm="Toggle this tag?">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-                <button hx-delete="/api/tags/{{.ID}}" hx-swap="outerHTML" hx-target="closest tr" hx-confirm="Delete tag '{{.Name}}' and all its schedules?" onclick="setTimeout(function(){location.reload()}, 500)">Delete</button>
+        </tr>
+        <tr id="tag-{{.ID}}-detail" class="tag-detail-row" style="display:none;">
+            <td colspan="6">
+                <div class="tag-detail">
+                    <div class="tag-containers-list">
+                        <strong>Containers:</strong>
+                        {{if .Containers}}
+                            {{range $i, $c := .Containers}}<span class="badge badge-tag">{{$c}}</span>{{end}}
+                        {{else}}
+                            <span class="muted">No containers assigned</span>
+                        {{end}}
+                    </div>
+                    <div class="tag-apply">
+                        <strong>Apply to containers:</strong>
+                        <div class="apply-row">
+                            <select id="apply-select-{{.ID}}" multiple class="apply-multi-select">
+                                {{range $.Containers}}
+                                <option value="{{.}}">{{.}} ({{index $.ContainerStates .}})</option>
+                                {{end}}
+                            </select>
+                            <button class="btn-primary btn-sm" onclick="applyTagToContainers('{{.ID}}')">Apply</button>
+                        </div>
+                    </div>
+                </div>
             </td>
         </tr>
         {{end}}
     </tbody>
 </table>
-<p class="hint">Use the <a href="/containers">Containers</a> page to assign containers to tags.</p>
 {{else}}
-<p>No tags configured. Create one above.</p>
+<p class="muted">No tags configured. Create one above.</p>
+{{end}}
 {{end}}
 
+{{define "scripts"}}
 <script>
 document.getElementById('start_preset').addEventListener('change', function() {
     if (this.value) {
@@ -82,23 +100,20 @@ document.getElementById('stop_preset').addEventListener('change', function() {
 });
 
 fetch('/api/presets')
-    .then(r => {
-        if (!r.ok) throw new Error('Failed to load presets: ' + r.status);
-        return r.json();
-    })
-    .then(presets => {
-        const categories = {};
-        presets.forEach(p => {
+    .then(function(r) { return r.json(); })
+    .then(function(presets) {
+        var categories = {};
+        presets.forEach(function(p) {
             if (!categories[p.category]) categories[p.category] = [];
             categories[p.category].push(p);
         });
-        ['start_preset', 'stop_preset'].forEach(selId => {
-            const sel = document.getElementById(selId);
-            Object.entries(categories).forEach(([cat, items]) => {
-                const group = document.createElement('optgroup');
+        ['start_preset', 'stop_preset'].forEach(function(selId) {
+            var sel = document.getElementById(selId);
+            Object.keys(categories).forEach(function(cat) {
+                var group = document.createElement('optgroup');
                 group.label = cat;
-                items.forEach(p => {
-                    const opt = document.createElement('option');
+                categories[cat].forEach(function(p) {
+                    var opt = document.createElement('option');
                     opt.value = p.expression;
                     opt.textContent = p.label;
                     group.appendChild(opt);
@@ -106,38 +121,65 @@ fetch('/api/presets')
                 if (group.children.length > 0) sel.appendChild(group);
             });
         });
-    })
-    .catch(err => console.error('Error loading presets:', err));
+    });
 
-document.getElementById('tag-form').addEventListener('submit', async function(e) {
+document.getElementById('tag-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const form = e.target;
-    const data = {
+    var form = e.target;
+    var data = {
         name: form.name.value,
         start_cron: form.start_cron.value,
         stop_cron: form.stop_cron.value,
         enabled: true
     };
-    try {
-        const resp = await fetch('/api/tags', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        });
-        if (resp.ok) {
+    fetch('/api/tags', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(function(r) {
+        if (r.ok) {
+            showToast('Tag created');
             window.location.reload();
         } else {
-            const text = await resp.text();
-            alert('Error: ' + text);
+            return r.text().then(function(t) { throw new Error(t); });
         }
-    } catch(err) {
-        alert('Error: ' + err.message);
-    }
+    }).catch(function(err) {
+        showToast(err.message, 'error');
+    });
 });
-</script>
 
-<style>
-.hint { color: #666; font-style: italic; margin-top: 8px; }
-.muted { color: #999; }
-</style>
+function toggleTagContainers(tagId) {
+    var row = document.getElementById('tag-' + tagId + '-detail');
+    if (row) {
+        row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+}
+
+function applyTagToContainers(tagId) {
+    var sel = document.getElementById('apply-select-' + tagId);
+    var selected = Array.from(sel.selectedOptions).map(function(o) { return o.value; });
+    if (selected.length === 0) {
+        showToast('Select at least one container', 'error');
+        return;
+    }
+    fetch('/api/tags/' + tagId + '/containers', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({containers: selected})
+    }).then(function(r) {
+        if (r.ok) {
+            return r.json().then(function(data) {
+                var created = data.created ? data.created.length : 0;
+                var skipped = data.skipped ? data.skipped.length : 0;
+                showToast('Applied: ' + created + ' created, ' + skipped + ' skipped');
+                window.location.reload();
+            });
+        } else {
+            return r.text().then(function(t) { throw new Error(t); });
+        }
+    }).catch(function(err) {
+        showToast(err.message, 'error');
+    });
+}
+</script>
 {{end}}
