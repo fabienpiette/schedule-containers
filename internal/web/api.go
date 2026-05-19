@@ -213,7 +213,19 @@ func (s *Server) apiStartContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("started container", "container", name)
-	s.respondNoContent(w, r, "Container%20started")
+	if wantsHTML(r) {
+		ctr, err := s.docker.GetContainer(r.Context(), name)
+		if err != nil {
+			slog.Error("failed to get container after start", "container", name, "error", err)
+			s.respondNoContent(w, r, "Container%20started")
+			return
+		}
+		cv := s.buildSingleContainerView(r.Context(), ctr)
+		w.Header().Set("X-Toast-Message", "Container%20started")
+		s.renderPartial(w, "container-row", cv)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) apiStopContainer(w http.ResponseWriter, r *http.Request) {
@@ -225,7 +237,19 @@ func (s *Server) apiStopContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("stopped container", "container", name)
-	s.respondNoContent(w, r, "Container%20stopped")
+	if wantsHTML(r) {
+		ctr, err := s.docker.GetContainer(r.Context(), name)
+		if err != nil {
+			slog.Error("failed to get container after stop", "container", name, "error", err)
+			s.respondNoContent(w, r, "Container%20stopped")
+			return
+		}
+		cv := s.buildSingleContainerView(r.Context(), ctr)
+		w.Header().Set("X-Toast-Message", "Container%20stopped")
+		s.renderPartial(w, "container-row", cv)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) apiListPresets(w http.ResponseWriter, r *http.Request) {
@@ -621,6 +645,26 @@ func (s *Server) apiApplyTagToContainers(w http.ResponseWriter, r *http.Request)
 		created = append(created, *createdSched)
 	}
 
+	if wantsHTML(r) && len(created) > 0 {
+		ctr, err := s.docker.GetContainer(r.Context(), created[0].ContainerName)
+		if err != nil {
+			slog.Error("failed to get container after tag apply", "container", created[0].ContainerName, "error", err)
+			http.Error(w, "failed to get container state", http.StatusInternalServerError)
+			return
+		}
+		cv := ContainerView{
+			ID:        ctr.ID,
+			Name:      ctr.Name,
+			Image:     ctr.Image,
+			State:     ctr.State,
+			Status:    ctr.Status,
+			StackName: ctr.StackName,
+			TagName:   tag.Name,
+			TagID:     tag.ID,
+		}
+		s.renderPartial(w, "container-row", cv)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"created": created,
@@ -644,5 +688,25 @@ func (s *Server) apiRemoveTagFromContainer(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	s.scheduler.RemoveSchedule(sched.ID)
-	s.respondNoContent(w, r, "Tag%20removed%20from%20container")
+
+	if wantsHTML(r) {
+		ctr, err := s.docker.GetContainer(r.Context(), containerName)
+		if err != nil {
+			slog.Error("failed to get container after tag remove", "container", containerName, "error", err)
+			s.respondNoContent(w, r, "Tag%20removed%20from%20container")
+			return
+		}
+		cv := ContainerView{
+			ID:        ctr.ID,
+			Name:      ctr.Name,
+			Image:     ctr.Image,
+			State:     ctr.State,
+			Status:    ctr.Status,
+			StackName: ctr.StackName,
+		}
+		w.Header().Set("X-Toast-Message", "Tag%20removed%20from%20container")
+		s.renderPartial(w, "container-row", cv)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
