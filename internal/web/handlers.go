@@ -207,6 +207,13 @@ func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 	containers, _ := s.docker.ListContainers(r.Context())
+	schedules, _ := s.store.ListSchedules()
+	tags, _ := s.store.ListTags()
+
+	tagCache := make(map[string]string)
+	for _, tag := range tags {
+		tagCache[tag.ID] = tag.Name
+	}
 
 	containerViews := make([]ContainerView, len(containers))
 	for i, c := range containers {
@@ -216,12 +223,31 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	scheduleViews := make([]ScheduleView, len(schedules))
+	for i, sched := range schedules {
+		sv := ScheduleView{
+			ID:            sched.ID,
+			ContainerName: sched.ContainerName,
+			DisplayName:   sched.DisplayName,
+			StackName:     sched.StackName,
+			StartCron:     sched.StartCron,
+			StopCron:      sched.StopCron,
+			Enabled:       sched.Enabled,
+		}
+		if sched.TagID != nil {
+			sv.TagName = tagCache[*sched.TagID]
+		}
+		scheduleViews[i] = sv
+	}
+
 	data := struct {
 		Title      string
 		Containers []ContainerView
+		Schedules  []ScheduleView
 	}{
-		Title:      "New Schedule",
+		Title:      "Schedules",
 		Containers: containerViews,
+		Schedules:  scheduleViews,
 	}
 
 	s.templates["schedules.html"].ExecuteTemplate(w, "layout", data)
