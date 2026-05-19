@@ -114,6 +114,15 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	return srv
 }
 
+func (s *Server) renderPartial(w http.ResponseWriter, name string, data interface{}) error {
+	for _, t := range s.templates {
+		if t.Lookup(name) != nil {
+			return t.ExecuteTemplate(w, name, data)
+		}
+	}
+	return fmt.Errorf("partial %s not found", name)
+}
+
 func (s *Server) Start() error {
 	err := s.httpServer.ListenAndServe()
 	if err == http.ErrServerClosed {

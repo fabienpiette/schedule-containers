@@ -18,6 +18,10 @@ type applyRequest struct {
 	Containers []string `json:"containers"`
 }
 
+func wantsHTML(r *http.Request) bool {
+	return strings.Contains(r.Header.Get("Accept"), "text/html")
+}
+
 func (s *Server) apiListContainers(w http.ResponseWriter, r *http.Request) {
 	containers, err := s.docker.ListContainers(r.Context())
 	if err != nil {
@@ -157,6 +161,12 @@ func (s *Server) apiDeleteSchedule(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.scheduler.RemoveSchedule(id)
+
+	if wantsHTML(r) {
+		w.Header().Set("X-Toast-Message", "Schedule+deleted")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -176,6 +186,29 @@ func (s *Server) apiToggleSchedule(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if wantsHTML(r) {
+		tagName := ""
+		if toggled.TagID != nil {
+			tag, err := s.store.GetTag(*toggled.TagID)
+			if err == nil {
+				tagName = tag.Name
+			}
+		}
+		sv := ScheduleView{
+			ID:            toggled.ID,
+			ContainerName: toggled.ContainerName,
+			DisplayName:   toggled.DisplayName,
+			StackName:     toggled.StackName,
+			StartCron:     toggled.StartCron,
+			StopCron:      toggled.StopCron,
+			Enabled:       toggled.Enabled,
+			TagName:       tagName,
+		}
+		w.Header().Set("X-Toast-Message", "Schedule+toggled")
+		s.renderPartial(w, "schedule-row", sv)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(toggled)
 }
@@ -189,6 +222,11 @@ func (s *Server) apiStartContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("started container", "container", name)
+	if wantsHTML(r) {
+		w.Header().Set("X-Toast-Message", "Container+started")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -201,6 +239,11 @@ func (s *Server) apiStopContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("stopped container", "container", name)
+	if wantsHTML(r) {
+		w.Header().Set("X-Toast-Message", "Container+stopped")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -244,6 +287,11 @@ func (s *Server) apiDeleteCustomPreset(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := s.presetService.Delete(id); err != nil {
 		http.Error(w, "preset not found", http.StatusNotFound)
+		return
+	}
+	if wantsHTML(r) {
+		w.Header().Set("X-Toast-Message", "Preset+deleted")
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -484,6 +532,11 @@ func (s *Server) apiDeleteTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if wantsHTML(r) {
+		w.Header().Set("X-Toast-Message", "Tag+deleted")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -517,6 +570,21 @@ func (s *Server) apiToggleTag(w http.ResponseWriter, r *http.Request) {
 				slog.Warn("failed to re-add schedule after tag toggle", "schedule_id", sched.ID, "error", err)
 			}
 		}
+	}
+
+	if wantsHTML(r) {
+		tagSchedules, _ := s.store.ListSchedulesByTag(updated.ID)
+		tv := TagView{
+			ID:             updated.ID,
+			Name:           updated.Name,
+			StartCron:      updated.StartCron,
+			StopCron:       updated.StopCron,
+			Enabled:        updated.Enabled,
+			ContainerCount: len(tagSchedules),
+		}
+		w.Header().Set("X-Toast-Message", "Tag+toggled")
+		s.renderPartial(w, "tag-row", tv)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -602,5 +670,11 @@ func (s *Server) apiRemoveTagFromContainer(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	s.scheduler.RemoveSchedule(sched.ID)
+
+	if wantsHTML(r) {
+		w.Header().Set("X-Toast-Message", "Tag+removed+from+container")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
