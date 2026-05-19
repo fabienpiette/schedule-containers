@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -92,13 +93,12 @@ func (s *Store) migrate() error {
 
 // --- Schedule CRUD ---
 
-func (s *Store) CreateSchedule(schedule *models.Schedule) (*models.Schedule, error) {
+func (s *Store) CreateSchedule(ctx context.Context, schedule *models.Schedule) (*models.Schedule, error) {
 	now := time.Now().UTC()
 	schedule.ID = uuid.New().String()
 	schedule.CreatedAt = now
 	schedule.UpdatedAt = now
-
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO schedules (id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		schedule.ID, schedule.ContainerName, schedule.DisplayName, schedule.StackName,
@@ -112,22 +112,21 @@ func (s *Store) CreateSchedule(schedule *models.Schedule) (*models.Schedule, err
 	return schedule, nil
 }
 
-func (s *Store) GetSchedule(id string) (*models.Schedule, error) {
-	row := s.db.QueryRow(`
+func (s *Store) GetSchedule(ctx context.Context, id string) (*models.Schedule, error) {
+	row := s.db.QueryRowContext(ctx, `
 		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
 		FROM schedules WHERE id = ?`, id)
 	return scanSchedule(row)
 }
 
-func (s *Store) ListSchedules() ([]models.Schedule, error) {
-	rows, err := s.db.Query(`
+func (s *Store) ListSchedules(ctx context.Context) ([]models.Schedule, error) {
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
 		FROM schedules ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	var schedules []models.Schedule
 	for rows.Next() {
 		sched, err := scanScheduleFromRows(rows)
@@ -139,9 +138,9 @@ func (s *Store) ListSchedules() ([]models.Schedule, error) {
 	return schedules, rows.Err()
 }
 
-func (s *Store) UpdateSchedule(schedule *models.Schedule) (*models.Schedule, error) {
+func (s *Store) UpdateSchedule(ctx context.Context, schedule *models.Schedule) (*models.Schedule, error) {
 	schedule.UpdatedAt = time.Now().UTC()
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE schedules SET container_name=?, display_name=?, stack_name=?, start_cron=?, stop_cron=?, enabled=?, on_demand_enabled=?, on_demand_url=?, idle_timeout_sec=?, tag_id=?, updated_at=?
 		WHERE id=?`,
 		schedule.ContainerName, schedule.DisplayName, schedule.StackName,
@@ -155,29 +154,28 @@ func (s *Store) UpdateSchedule(schedule *models.Schedule) (*models.Schedule, err
 	return schedule, nil
 }
 
-func (s *Store) DeleteSchedule(id string) error {
-	_, err := s.db.Exec("DELETE FROM schedules WHERE id = ?", id)
+func (s *Store) DeleteSchedule(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM schedules WHERE id = ?", id)
 	return err
 }
 
-func (s *Store) ToggleSchedule(id string) (*models.Schedule, error) {
-	sched, err := s.GetSchedule(id)
+func (s *Store) ToggleSchedule(ctx context.Context, id string) (*models.Schedule, error) {
+	sched, err := s.GetSchedule(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	sched.Enabled = !sched.Enabled
-	return s.UpdateSchedule(sched)
+	return s.UpdateSchedule(ctx, sched)
 }
 
-func (s *Store) ListSchedulesByTag(tagID string) ([]models.Schedule, error) {
-	rows, err := s.db.Query(`
+func (s *Store) ListSchedulesByTag(ctx context.Context, tagID string) ([]models.Schedule, error) {
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
 		FROM schedules WHERE tag_id = ? ORDER BY created_at`, tagID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	var schedules []models.Schedule
 	for rows.Next() {
 		sched, err := scanScheduleFromRows(rows)
@@ -189,8 +187,8 @@ func (s *Store) ListSchedulesByTag(tagID string) ([]models.Schedule, error) {
 	return schedules, rows.Err()
 }
 
-func (s *Store) GetScheduleByTagAndContainer(tagID, containerName string) (*models.Schedule, error) {
-	row := s.db.QueryRow(`
+func (s *Store) GetScheduleByTagAndContainer(ctx context.Context, tagID, containerName string) (*models.Schedule, error) {
+	row := s.db.QueryRowContext(ctx, `
 		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
 		FROM schedules WHERE tag_id = ? AND container_name = ?`, tagID, containerName)
 	return scanSchedule(row)
@@ -228,13 +226,12 @@ func scanScheduleFromRows(rows *sql.Rows) (*models.Schedule, error) {
 
 // --- Tag CRUD ---
 
-func (s *Store) CreateTag(tag *models.Tag) (*models.Tag, error) {
+func (s *Store) CreateTag(ctx context.Context, tag *models.Tag) (*models.Tag, error) {
 	now := time.Now().UTC()
 	tag.ID = uuid.New().String()
 	tag.CreatedAt = now
 	tag.UpdatedAt = now
-
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO tags (id, name, start_cron, stop_cron, enabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		tag.ID, tag.Name, tag.StartCron, tag.StopCron, tag.Enabled,
@@ -246,29 +243,28 @@ func (s *Store) CreateTag(tag *models.Tag) (*models.Tag, error) {
 	return tag, nil
 }
 
-func (s *Store) GetTag(id string) (*models.Tag, error) {
-	row := s.db.QueryRow(`
+func (s *Store) GetTag(ctx context.Context, id string) (*models.Tag, error) {
+	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, start_cron, stop_cron, enabled, created_at, updated_at
 		FROM tags WHERE id = ?`, id)
 	return scanTag(row)
 }
 
-func (s *Store) GetTagByName(name string) (*models.Tag, error) {
-	row := s.db.QueryRow(`
+func (s *Store) GetTagByName(ctx context.Context, name string) (*models.Tag, error) {
+	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, start_cron, stop_cron, enabled, created_at, updated_at
 		FROM tags WHERE name = ?`, name)
 	return scanTag(row)
 }
 
-func (s *Store) ListTags() ([]models.Tag, error) {
-	rows, err := s.db.Query(`
+func (s *Store) ListTags(ctx context.Context) ([]models.Tag, error) {
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, name, start_cron, stop_cron, enabled, created_at, updated_at
 		FROM tags ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	var tags []models.Tag
 	for rows.Next() {
 		var tag models.Tag
@@ -280,9 +276,9 @@ func (s *Store) ListTags() ([]models.Tag, error) {
 	return tags, rows.Err()
 }
 
-func (s *Store) UpdateTag(tag *models.Tag) (*models.Tag, error) {
+func (s *Store) UpdateTag(ctx context.Context, tag *models.Tag) (*models.Tag, error) {
 	tag.UpdatedAt = time.Now().UTC()
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE tags SET name=?, start_cron=?, stop_cron=?, enabled=?, updated_at=?
 		WHERE id=?`,
 		tag.Name, tag.StartCron, tag.StopCron, tag.Enabled, tag.UpdatedAt, tag.ID,
@@ -293,18 +289,16 @@ func (s *Store) UpdateTag(tag *models.Tag) (*models.Tag, error) {
 	return tag, nil
 }
 
-func (s *Store) DeleteTag(id string) error {
-	tx, err := s.db.Begin()
+func (s *Store) DeleteTag(ctx context.Context, id string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec("DELETE FROM schedules WHERE tag_id = ?", id)
-	if err != nil {
+	if _, err = tx.ExecContext(ctx, "DELETE FROM schedules WHERE tag_id = ?", id); err != nil {
 		tx.Rollback()
 		return err
 	}
-	_, err = tx.Exec("DELETE FROM tags WHERE id = ?", id)
-	if err != nil {
+	if _, err = tx.ExecContext(ctx, "DELETE FROM tags WHERE id = ?", id); err != nil {
 		tx.Rollback()
 		return err
 	}

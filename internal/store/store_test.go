@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestCreateAndGetSchedule(t *testing.T) {
 		StopCron:      "0 18 * * 1-5",
 		Enabled:       true,
 	}
-	created, err := s.CreateSchedule(sched)
+	created, err := s.CreateSchedule(context.Background(), sched)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -54,7 +55,7 @@ func TestCreateAndGetSchedule(t *testing.T) {
 		t.Error("expected non-zero CreatedAt")
 	}
 
-	got, err := s.GetSchedule(created.ID)
+	got, err := s.GetSchedule(context.Background(), created.ID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -70,10 +71,10 @@ func TestListSchedules(t *testing.T) {
 	s := tempDB(t)
 	s1 := &models.Schedule{ContainerName: "app1", DisplayName: "app1", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
 	s2 := &models.Schedule{ContainerName: "app2", DisplayName: "app2", StartCron: "0 9 * * *", StopCron: "0 19 * * *", Enabled: false}
-	s.CreateSchedule(s1)
-	s.CreateSchedule(s2)
+	s.CreateSchedule(context.Background(), s1)
+	s.CreateSchedule(context.Background(), s2)
 
-	schedules, err := s.ListSchedules()
+	schedules, err := s.ListSchedules(context.Background())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -85,10 +86,10 @@ func TestListSchedules(t *testing.T) {
 func TestUpdateSchedule(t *testing.T) {
 	s := tempDB(t)
 	sched := &models.Schedule{ContainerName: "app1", DisplayName: "app1", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
-	created, _ := s.CreateSchedule(sched)
+	created, _ := s.CreateSchedule(context.Background(), sched)
 
 	created.StartCron = "0 9 * * *"
-	updated, err := s.UpdateSchedule(created)
+	updated, err := s.UpdateSchedule(context.Background(), created)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -100,14 +101,14 @@ func TestUpdateSchedule(t *testing.T) {
 func TestDeleteSchedule(t *testing.T) {
 	s := tempDB(t)
 	sched := &models.Schedule{ContainerName: "app1", DisplayName: "app1", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
-	created, _ := s.CreateSchedule(sched)
+	created, _ := s.CreateSchedule(context.Background(), sched)
 
-	err := s.DeleteSchedule(created.ID)
+	err := s.DeleteSchedule(context.Background(), created.ID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	_, err = s.GetSchedule(created.ID)
+	_, err = s.GetSchedule(context.Background(), created.ID)
 	if err == nil {
 		t.Error("expected error getting deleted schedule")
 	}
@@ -116,9 +117,9 @@ func TestDeleteSchedule(t *testing.T) {
 func TestToggleSchedule(t *testing.T) {
 	s := tempDB(t)
 	sched := &models.Schedule{ContainerName: "app1", DisplayName: "app1", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
-	created, _ := s.CreateSchedule(sched)
+	created, _ := s.CreateSchedule(context.Background(), sched)
 
-	toggled, err := s.ToggleSchedule(created.ID)
+	toggled, err := s.ToggleSchedule(context.Background(), created.ID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -126,7 +127,7 @@ func TestToggleSchedule(t *testing.T) {
 		t.Errorf("expected Enabled=false, got %v", toggled.Enabled)
 	}
 
-	toggled2, err := s.ToggleSchedule(created.ID)
+	toggled2, err := s.ToggleSchedule(context.Background(), created.ID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -137,7 +138,7 @@ func TestToggleSchedule(t *testing.T) {
 
 func TestScheduleWithTagID(t *testing.T) {
 	s := tempDB(t)
-	tag, _ := s.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := s.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 	tagID := tag.ID
 	sched := &models.Schedule{
 		ContainerName: "my-app",
@@ -147,7 +148,7 @@ func TestScheduleWithTagID(t *testing.T) {
 		Enabled:       true,
 		TagID:         &tagID,
 	}
-	created, err := s.CreateSchedule(sched)
+	created, err := s.CreateSchedule(context.Background(), sched)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -155,7 +156,7 @@ func TestScheduleWithTagID(t *testing.T) {
 		t.Errorf("expected TagID=%s, got %v", tagID, created.TagID)
 	}
 
-	got, _ := s.GetSchedule(created.ID)
+	got, _ := s.GetSchedule(context.Background(), created.ID)
 	if got.TagID == nil || *got.TagID != tagID {
 		t.Errorf("expected TagID=%s on read, got %v", tagID, got.TagID)
 	}
@@ -170,7 +171,7 @@ func TestScheduleWithoutTagID(t *testing.T) {
 		StopCron:      "0 18 * * *",
 		Enabled:       true,
 	}
-	created, err := s.CreateSchedule(sched)
+	created, err := s.CreateSchedule(context.Background(), sched)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -178,7 +179,7 @@ func TestScheduleWithoutTagID(t *testing.T) {
 		t.Errorf("expected nil TagID, got %v", created.TagID)
 	}
 
-	got, _ := s.GetSchedule(created.ID)
+	got, _ := s.GetSchedule(context.Background(), created.ID)
 	if got.TagID != nil {
 		t.Errorf("expected nil TagID on read, got %v", got.TagID)
 	}
@@ -194,7 +195,7 @@ func TestCreateTag(t *testing.T) {
 		StopCron:  "0 18 * * 1-5",
 		Enabled:   true,
 	}
-	created, err := s.CreateTag(tag)
+	created, err := s.CreateTag(context.Background(), tag)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -212,9 +213,9 @@ func TestCreateTag(t *testing.T) {
 func TestGetTag(t *testing.T) {
 	s := tempDB(t)
 	tag := &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
-	created, _ := s.CreateTag(tag)
+	created, _ := s.CreateTag(context.Background(), tag)
 
-	got, err := s.GetTag(created.ID)
+	got, err := s.GetTag(context.Background(), created.ID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -225,9 +226,9 @@ func TestGetTag(t *testing.T) {
 
 func TestGetTagByName(t *testing.T) {
 	s := tempDB(t)
-	s.CreateTag(&models.Tag{Name: "mytag", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	s.CreateTag(context.Background(), &models.Tag{Name: "mytag", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 
-	got, err := s.GetTagByName("mytag")
+	got, err := s.GetTagByName(context.Background(), "mytag")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -238,10 +239,10 @@ func TestGetTagByName(t *testing.T) {
 
 func TestListTags(t *testing.T) {
 	s := tempDB(t)
-	s.CreateTag(&models.Tag{Name: "tag1", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
-	s.CreateTag(&models.Tag{Name: "tag2", StartCron: "0 9 * * *", StopCron: "0 19 * * *", Enabled: true})
+	s.CreateTag(context.Background(), &models.Tag{Name: "tag1", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	s.CreateTag(context.Background(), &models.Tag{Name: "tag2", StartCron: "0 9 * * *", StopCron: "0 19 * * *", Enabled: true})
 
-	tags, err := s.ListTags()
+	tags, err := s.ListTags(context.Background())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -253,10 +254,10 @@ func TestListTags(t *testing.T) {
 func TestUpdateTag(t *testing.T) {
 	s := tempDB(t)
 	tag := &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
-	created, _ := s.CreateTag(tag)
+	created, _ := s.CreateTag(context.Background(), tag)
 
 	created.StartCron = "0 9 * * *"
-	updated, err := s.UpdateTag(created)
+	updated, err := s.UpdateTag(context.Background(), created)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -268,14 +269,14 @@ func TestUpdateTag(t *testing.T) {
 func TestDeleteTag(t *testing.T) {
 	s := tempDB(t)
 	tag := &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
-	created, _ := s.CreateTag(tag)
+	created, _ := s.CreateTag(context.Background(), tag)
 
-	err := s.DeleteTag(created.ID)
+	err := s.DeleteTag(context.Background(), created.ID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	_, err = s.GetTag(created.ID)
+	_, err = s.GetTag(context.Background(), created.ID)
 	if err == nil {
 		t.Error("expected error getting deleted tag")
 	}
@@ -283,10 +284,10 @@ func TestDeleteTag(t *testing.T) {
 
 func TestDeleteTagCascadesSchedules(t *testing.T) {
 	s := tempDB(t)
-	tag, _ := s.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := s.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 
 	tagID := tag.ID
-	s.CreateSchedule(&models.Schedule{
+	s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 8 * * *",
@@ -294,7 +295,7 @@ func TestDeleteTagCascadesSchedules(t *testing.T) {
 		Enabled:       true,
 		TagID:         &tagID,
 	})
-	s.CreateSchedule(&models.Schedule{
+	s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "other",
 		DisplayName:   "other",
 		StartCron:     "0 9 * * *",
@@ -302,12 +303,12 @@ func TestDeleteTagCascadesSchedules(t *testing.T) {
 		Enabled:       true,
 	})
 
-	err := s.DeleteTag(tag.ID)
+	err := s.DeleteTag(context.Background(), tag.ID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	schedules, _ := s.ListSchedules()
+	schedules, _ := s.ListSchedules(context.Background())
 	if len(schedules) != 1 {
 		t.Errorf("expected 1 schedule remaining (direct), got %d", len(schedules))
 	}
@@ -318,9 +319,9 @@ func TestDeleteTagCascadesSchedules(t *testing.T) {
 
 func TestListSchedulesByTag(t *testing.T) {
 	s := tempDB(t)
-	tag, _ := s.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := s.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 	tagID := tag.ID
-	s.CreateSchedule(&models.Schedule{
+	s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "app1",
 		DisplayName:   "app1",
 		StartCron:     "0 8 * * *",
@@ -328,7 +329,7 @@ func TestListSchedulesByTag(t *testing.T) {
 		Enabled:       true,
 		TagID:         &tagID,
 	})
-	s.CreateSchedule(&models.Schedule{
+	s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "app2",
 		DisplayName:   "app2",
 		StartCron:     "0 8 * * *",
@@ -336,7 +337,7 @@ func TestListSchedulesByTag(t *testing.T) {
 		Enabled:       true,
 		TagID:         &tagID,
 	})
-	s.CreateSchedule(&models.Schedule{
+	s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "standalone",
 		DisplayName:   "standalone",
 		StartCron:     "0 9 * * *",
@@ -344,7 +345,7 @@ func TestListSchedulesByTag(t *testing.T) {
 		Enabled:       true,
 	})
 
-	tagSchedules, err := s.ListSchedulesByTag(tagID)
+	tagSchedules, err := s.ListSchedulesByTag(context.Background(), tagID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -355,9 +356,9 @@ func TestListSchedulesByTag(t *testing.T) {
 
 func TestGetScheduleByTagAndContainer(t *testing.T) {
 	s := tempDB(t)
-	tag, _ := s.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := s.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 	tagID := tag.ID
-	s.CreateSchedule(&models.Schedule{
+	s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 8 * * *",
@@ -366,7 +367,7 @@ func TestGetScheduleByTagAndContainer(t *testing.T) {
 		TagID:         &tagID,
 	})
 
-	sched, err := s.GetScheduleByTagAndContainer(tagID, "my-app")
+	sched, err := s.GetScheduleByTagAndContainer(context.Background(), tagID, "my-app")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -377,9 +378,9 @@ func TestGetScheduleByTagAndContainer(t *testing.T) {
 
 func TestDuplicateTagAndContainer(t *testing.T) {
 	s := tempDB(t)
-	tag, _ := s.CreateTag(&models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	tag, _ := s.CreateTag(context.Background(), &models.Tag{Name: "test", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
 	tagID := tag.ID
-	s.CreateSchedule(&models.Schedule{
+	s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 8 * * *",
@@ -388,7 +389,7 @@ func TestDuplicateTagAndContainer(t *testing.T) {
 		TagID:         &tagID,
 	})
 
-	_, err := s.CreateSchedule(&models.Schedule{
+	_, err := s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 8 * * *",
@@ -403,14 +404,14 @@ func TestDuplicateTagAndContainer(t *testing.T) {
 
 func TestUniqueTagContainerAllowsNull(t *testing.T) {
 	s := tempDB(t)
-	s.CreateSchedule(&models.Schedule{
+	s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 8 * * *",
 		StopCron:      "0 18 * * *",
 		Enabled:       true,
 	})
-	s.CreateSchedule(&models.Schedule{
+	s.CreateSchedule(context.Background(), &models.Schedule{
 		ContainerName: "my-app",
 		DisplayName:   "my-app",
 		StartCron:     "0 9 * * *",
@@ -418,7 +419,7 @@ func TestUniqueTagContainerAllowsNull(t *testing.T) {
 		Enabled:       true,
 	})
 
-	schedules, _ := s.ListSchedules()
+	schedules, _ := s.ListSchedules(context.Background())
 	if len(schedules) != 2 {
 		t.Errorf("expected 2 schedules with null tag_id and same container, got %d", len(schedules))
 	}
