@@ -21,7 +21,7 @@ PUSH_TAGS ?= latest
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 .PHONY: build run test vet lint clean \
-	docker-build docker-up docker-down docker-logs docker-push docker-push-tags \
+	docker-build docker-up docker-down docker-restart docker-logs docker-push docker-push-tags \
 	docker-release docker-verify docker-pull \
 	install
 
@@ -55,6 +55,8 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+docker-restart: docker-down docker-up
 
 docker-logs:
 	docker compose logs -f

@@ -47,22 +47,36 @@
     </tbody>
 </table>
 
-<h2>Containers</h2>
+<h2>Tags</h2>
 {{if .Tags}}
-<div class="bulk-actions">
-    <select id="bulk-tag-select">
-        <option value="">Select a tag...</option>
-        {{range .Tags}}
-        <option value="{{.ID}}">{{.Name}}</option>
-        {{end}}
-    </select>
-    <button onclick="applyTagToSelected()">Apply Tag to Selected</button>
-</div>
-{{end}}
 <table>
     <thead>
         <tr>
-            <th><input type="checkbox" id="select-all" onchange="toggleAll(this)"></th>
+            <th>Name</th>
+            <th>Start Cron</th>
+            <th>Stop Cron</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Tags}}
+        <tr>
+            <td><a href="/tags">{{.Name}}</a></td>
+            <td><code>{{.StartCron}}</code></td>
+            <td><code>{{.StopCron}}</code></td>
+            <td>{{if .Enabled}}<span class="badge-enabled">Enabled</span>{{else}}<span class="badge-disabled">Disabled</span>{{end}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p>No tags configured. <a href="/tags">Create one</a>.</p>
+{{end}}
+
+<h2>Containers</h2>
+<h2>Scheduled Containers</h2>
+    <thead>
+        <tr>
             <th>Name</th>
             <th>Image</th>
             <th>State</th>
@@ -74,7 +88,6 @@
     <tbody>
         {{range .Containers}}
         <tr>
-            <td><input type="checkbox" class="container-check" value="{{.Name}}" data-tag="{{.TagName}}"></td>
             <td>{{.Name}}</td>
             <td>{{.Image}}</td>
             <td class="state-{{.State}}">{{.State}}</td>
@@ -95,29 +108,6 @@
 </table>
 
 <script>
-function toggleAll(source) {
-    document.querySelectorAll('.container-check').forEach(cb => cb.checked = source.checked);
-}
-
-function applyTagToSelected() {
-    const tagId = document.getElementById('bulk-tag-select').value;
-    if (!tagId) { alert('Select a tag first'); return; }
-    const checked = document.querySelectorAll('.container-check:checked');
-    if (checked.length === 0) { alert('Select at least one container'); return; }
-    const containers = Array.from(checked).map(cb => cb.value);
-    fetch('/api/tags/' + tagId + '/containers', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({containers: containers})
-    }).then(r => {
-        if (r.ok) {
-            window.location.reload();
-        } else {
-            r.text().then(t => alert('Error: ' + t));
-        }
-    }).catch(err => alert('Error: ' + err.message));
-}
-
 function exportSchedules() {
     fetch('/api/export')
         .then(r => r.blob())
@@ -151,8 +141,11 @@ function importSchedules(event) {
     })
     .catch(err => alert('Import failed: ' + err.message));
 }
+</script>
+
+<style>
 .bulk-actions { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; }
 .muted { color: #999; }
 .btn-remove-tag { background: none; border: none; color: #c00; cursor: pointer; padding: 0 2px; font-weight: bold; font-size: 0.85em; }
-</script>
+</style>
 {{end}}

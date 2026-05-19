@@ -100,9 +100,17 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		scheduleViews[i] = sv
 	}
 
-	containerViews := make([]ContainerView, len(containers))
-	for i, c := range containers {
-		containerViews[i] = ContainerView{
+	scheduledContainers := make(map[string]bool)
+	for _, sched := range schedules {
+		scheduledContainers[sched.ContainerName] = true
+	}
+
+	containerViews := make([]ContainerView, 0, len(containers))
+	for _, c := range containers {
+		if !scheduledContainers[c.Name] {
+			continue
+		}
+		containerViews = append(containerViews, ContainerView{
 			ID:        c.ID,
 			Name:      c.Name,
 			Image:     c.Image,
@@ -111,7 +119,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			StackName: c.StackName,
 			TagName:   schedByContainer[c.Name],
 			TagID:     tagIDByContainer[c.Name],
-		}
+		})
 	}
 
 	data := DashboardData{
