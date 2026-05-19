@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -38,7 +39,7 @@ var scheduleListCmd = &cobra.Command{
 		}
 		defer db.Close()
 
-		schedules, err := db.ListSchedules()
+		schedules, err := db.ListSchedules(context.Background())
 		if err != nil {
 			slog.Error("failed to list schedules", "error", err)
 			os.Exit(1)
@@ -101,7 +102,7 @@ var scheduleAddCmd = &cobra.Command{
 			Enabled:        true,
 		}
 
-		created, err := db.CreateSchedule(schedule)
+		created, err := db.CreateSchedule(context.Background(), schedule)
 		if err != nil {
 			slog.Error("failed to create schedule", "error", err)
 			os.Exit(1)
@@ -128,7 +129,7 @@ var scheduleRemoveCmd = &cobra.Command{
 		}
 		defer db.Close()
 
-		if err := db.DeleteSchedule(args[0]); err != nil {
+		if err := db.DeleteSchedule(context.Background(), args[0]); err != nil {
 			slog.Error("failed to delete schedule", "error", err)
 			os.Exit(1)
 		}
@@ -154,7 +155,7 @@ var scheduleExportCmd = &cobra.Command{
 		}
 		defer db.Close()
 
-		schedules, err := db.ListSchedules()
+		schedules, err := db.ListSchedules(context.Background())
 		if err != nil {
 			slog.Error("failed to list schedules", "error", err)
 			os.Exit(1)
@@ -209,7 +210,7 @@ var scheduleImportCmd = &cobra.Command{
 
 		created := 0
 		for _, s := range schedules {
-			if _, err := db.CreateSchedule(&s); err != nil {
+			if _, err := db.CreateSchedule(context.Background(), &s); err != nil {
 				slog.Error("failed to create schedule", "container", s.ContainerName, "error", err)
 				continue
 			}

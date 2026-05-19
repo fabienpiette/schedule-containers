@@ -46,7 +46,7 @@ var serveCmd = &cobra.Command{
 
 		sched := scheduler.NewScheduler(dockerClient, cfg.Timezone)
 
-		schedules, err := db.ListSchedules()
+		schedules, err := db.ListSchedules(context.Background())
 		if err != nil {
 			slog.Error("failed to load schedules", "error", err)
 			os.Exit(1)

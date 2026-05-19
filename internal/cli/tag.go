@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -38,7 +39,7 @@ var tagListCmd = &cobra.Command{
 		}
 		defer db.Close()
 
-		tags, err := db.ListTags()
+		tags, err := db.ListTags(context.Background())
 		if err != nil {
 			slog.Error("failed to list tags", "error", err)
 			os.Exit(1)
@@ -102,7 +103,7 @@ var tagAddCmd = &cobra.Command{
 			StopCron:  stopCron,
 			Enabled:   true,
 		}
-		created, err := db.CreateTag(tag)
+		created, err := db.CreateTag(context.Background(), tag)
 		if err != nil {
 			slog.Error("failed to create tag", "error", err)
 			os.Exit(1)
@@ -130,16 +131,16 @@ var tagRemoveCmd = &cobra.Command{
 		defer db.Close()
 
 		id := args[0]
-		tag, err := db.GetTag(id)
+		tag, err := db.GetTag(context.Background(), id)
 		if err != nil {
-			tag, err = db.GetTagByName(id)
+			tag, err = db.GetTagByName(context.Background(), id)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "tag not found: %s\n", id)
 				os.Exit(1)
 			}
 		}
 
-		if err := db.DeleteTag(tag.ID); err != nil {
+		if err := db.DeleteTag(context.Background(), tag.ID); err != nil {
 			slog.Error("failed to delete tag", "error", err)
 			os.Exit(1)
 		}
@@ -166,9 +167,9 @@ var tagToggleCmd = &cobra.Command{
 		defer db.Close()
 
 		id := args[0]
-		tag, err := db.GetTag(id)
+		tag, err := db.GetTag(context.Background(), id)
 		if err != nil {
-			tag, err = db.GetTagByName(id)
+			tag, err = db.GetTagByName(context.Background(), id)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "tag not found: %s\n", id)
 				os.Exit(1)
@@ -176,7 +177,7 @@ var tagToggleCmd = &cobra.Command{
 		}
 
 		tag.Enabled = !tag.Enabled
-		updated, err := db.UpdateTag(tag)
+		updated, err := db.UpdateTag(context.Background(), tag)
 		if err != nil {
 			slog.Error("failed to toggle tag", "error", err)
 			os.Exit(1)
@@ -211,9 +212,9 @@ var tagApplyCmd = &cobra.Command{
 		defer db.Close()
 
 		id := args[0]
-		tag, err := db.GetTag(id)
+		tag, err := db.GetTag(context.Background(), id)
 		if err != nil {
-			tag, err = db.GetTagByName(id)
+			tag, err = db.GetTagByName(context.Background(), id)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "tag not found: %s\n", id)
 				os.Exit(1)
@@ -224,7 +225,7 @@ var tagApplyCmd = &cobra.Command{
 		created := 0
 		skipped := 0
 		for _, c := range containers {
-			existing, _ := db.GetScheduleByTagAndContainer(tagID, c)
+			existing, _ := db.GetScheduleByTagAndContainer(context.Background(), tagID, c)
 			if existing != nil {
 				fmt.Printf("Skipped %s (already has this tag)\n", c)
 				skipped++
@@ -239,7 +240,7 @@ var tagApplyCmd = &cobra.Command{
 				TagID:           &tagID,
 				OnDemandEnabled: false,
 			}
-			if _, err := db.CreateSchedule(sched); err != nil {
+			if _, err := db.CreateSchedule(context.Background(), sched); err != nil {
 				slog.Error("failed to create schedule", "container", c, "error", err)
 				continue
 			}
@@ -274,22 +275,22 @@ var tagRemoveContainerCmd = &cobra.Command{
 		defer db.Close()
 
 		id := args[0]
-		tag, err := db.GetTag(id)
+		tag, err := db.GetTag(context.Background(), id)
 		if err != nil {
-			tag, err = db.GetTagByName(id)
+			tag, err = db.GetTagByName(context.Background(), id)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "tag not found: %s\n", id)
 				os.Exit(1)
 			}
 		}
 
-		sched, err := db.GetScheduleByTagAndContainer(tag.ID, containerName)
+		sched, err := db.GetScheduleByTagAndContainer(context.Background(), tag.ID, containerName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "no schedule found for tag %s and container %s\n", tag.Name, containerName)
 			os.Exit(1)
 		}
 
-		if err := db.DeleteSchedule(sched.ID); err != nil {
+		if err := db.DeleteSchedule(context.Background(), sched.ID); err != nil {
 			slog.Error("failed to delete schedule", "error", err)
 			os.Exit(1)
 		}
