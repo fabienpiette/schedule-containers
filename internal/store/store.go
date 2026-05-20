@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gndm/schedule-containers/internal/models"
@@ -185,6 +187,20 @@ func (s *Store) ListSchedulesByTag(ctx context.Context, tagID string) ([]models.
 		schedules = append(schedules, *sched)
 	}
 	return schedules, rows.Err()
+}
+
+func (s *Store) GetOnDemandSchedule(ctx context.Context, containerName string) (*models.Schedule, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
+		FROM schedules WHERE container_name = ? AND on_demand_enabled = TRUE`, containerName)
+	sched, err := scanSchedule(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("get on-demand schedule for container %q: %w", containerName, sql.ErrNoRows)
+		}
+		return nil, err
+	}
+	return sched, nil
 }
 
 func (s *Store) GetScheduleByTagAndContainer(ctx context.Context, tagID, containerName string) (*models.Schedule, error) {

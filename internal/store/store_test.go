@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"os"
 	"testing"
 
@@ -399,6 +401,60 @@ func TestDuplicateTagAndContainer(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("expected error for duplicate tag_id + container_name")
+	}
+}
+
+func TestGetOnDemandSchedule(t *testing.T) {
+	s := tempDB(t)
+
+	_, err := s.GetOnDemandSchedule(context.Background(), "my-app")
+	if !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("expected sql.ErrNoRows, got %v", err)
+	}
+
+	sched := &models.Schedule{
+		ContainerName:   "my-app",
+		DisplayName:     "My App",
+		StackName:       "webstack",
+		StartCron:       "0 8 * * 1-5",
+		StopCron:        "0 18 * * 1-5",
+		Enabled:         true,
+		OnDemandEnabled: true,
+		OnDemandURL:     "http://example.com",
+		IdleTimeoutSec:  300,
+	}
+	created, _ := s.CreateSchedule(context.Background(), sched)
+
+	got, err := s.GetOnDemandSchedule(context.Background(), "my-app")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.ID != created.ID {
+		t.Errorf("expected ID %s, got %s", created.ID, got.ID)
+	}
+	if got.OnDemandEnabled != true {
+		t.Error("expected OnDemandEnabled=true")
+	}
+	if got.OnDemandURL != "http://example.com" {
+		t.Errorf("expected OnDemandURL 'http://example.com', got %s", got.OnDemandURL)
+	}
+	if got.IdleTimeoutSec != 300 {
+		t.Errorf("expected IdleTimeoutSec 300, got %d", got.IdleTimeoutSec)
+	}
+
+	offSched := &models.Schedule{
+		ContainerName:   "other-app",
+		DisplayName:     "Other App",
+		StartCron:       "0 9 * * *",
+		StopCron:        "0 19 * * *",
+		Enabled:         true,
+		OnDemandEnabled: false,
+	}
+	s.CreateSchedule(context.Background(), offSched)
+
+	_, err = s.GetOnDemandSchedule(context.Background(), "other-app")
+	if !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("expected sql.ErrNoRows for non-on-demand container, got %v", err)
 	}
 }
 
