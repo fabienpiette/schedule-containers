@@ -13,6 +13,7 @@ import (
 	"github.com/gndm/schedule-containers/internal/config"
 	"github.com/gndm/schedule-containers/internal/cronpresets"
 	"github.com/gndm/schedule-containers/internal/docker"
+	"github.com/gndm/schedule-containers/internal/ondemand"
 	"github.com/gndm/schedule-containers/internal/scheduler"
 	"github.com/gndm/schedule-containers/internal/store"
 	"github.com/gndm/schedule-containers/internal/web"
@@ -62,13 +63,19 @@ var serveCmd = &cobra.Command{
 		sched.Start()
 		slog.Info("scheduler started", "schedules_loaded", len(schedules))
 
+		odm := ondemand.NewManager(dockerClient, db)
+		if err := odm.Start(cmd.Context()); err != nil {
+			slog.Error("failed to start on-demand manager", "error", err)
+			os.Exit(1)
+		}
+
 		presetSvc, err := cronpresets.NewService(cfg.PresetsPath)
 		if err != nil {
 			slog.Error("failed to initialize preset service", "error", err)
 			os.Exit(1)
 		}
 
-		webSrv := web.NewServer(cfg, db, dockerClient, sched, presetSvc)
+		webSrv := web.NewServer(cfg, db, dockerClient, sched, presetSvc, odm)
 		go func() {
 			if err := webSrv.Start(); err != nil {
 				slog.Error("web server error", "error", err)
@@ -80,6 +87,7 @@ var serveCmd = &cobra.Command{
 		<-sigCh
 
 		slog.Info("shutting down")
+		odm.Stop()
 		sched.Stop()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()

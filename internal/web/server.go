@@ -17,6 +17,7 @@ import (
 	"github.com/gndm/schedule-containers/internal/cronpresets"
 	"github.com/gndm/schedule-containers/internal/docker"
 	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/gndm/schedule-containers/internal/ondemand"
 	"github.com/gndm/schedule-containers/internal/scheduler"
 	"github.com/gndm/schedule-containers/internal/store"
 )
@@ -33,6 +34,7 @@ type Server struct {
 	docker        *docker.Client
 	scheduler     SchedulerService
 	presetService *cronpresets.Service
+	ondemand      *ondemand.OnDemandManager
 	templates     map[string]*template.Template
 }
 
@@ -41,7 +43,7 @@ var embeddedFS embed.FS
 
 var _ SchedulerService = (*scheduler.Scheduler)(nil)
 
-func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service) *Server {
+func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service, odm *ondemand.OnDemandManager) *Server {
 	baseFiles := []string{
 		"templates/layout.html",
 		"templates/partials.html",
@@ -65,6 +67,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		docker:        d,
 		scheduler:     sched,
 		presetService: ps,
+		ondemand:      odm,
 		templates:     templates,
 	}
 
@@ -79,10 +82,14 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	r.Get("/schedules", srv.handleSchedulesNew)
 	r.Get("/presets", srv.handlePresets)
 	r.Get("/tags", srv.handleTags)
+	r.Get("/wake/{name}", srv.handleWake)
+	r.Get("/wake/{name}/status", srv.handleWakeStatus)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/containers", srv.apiListContainers)
+		r.Get("/containers/{name}/health", srv.apiContainerHealth)
 		r.Get("/schedules", srv.apiListSchedules)
+		r.Get("/schedules/{id}/wake-url", srv.apiWakeURL)
 		r.Post("/schedules", srv.apiCreateSchedule)
 		r.Put("/schedules/{id}", srv.apiUpdateSchedule)
 		r.Delete("/schedules/{id}", srv.apiDeleteSchedule)
@@ -140,4 +147,20 @@ func (s *Server) Start() error {
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
+}
+
+func (s *Server) handleWake(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "not implemented", http.StatusNotImplemented)
+}
+
+func (s *Server) handleWakeStatus(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "not implemented", http.StatusNotImplemented)
+}
+
+func (s *Server) apiContainerHealth(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "not implemented", http.StatusNotImplemented)
+}
+
+func (s *Server) apiWakeURL(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "not implemented", http.StatusNotImplemented)
 }

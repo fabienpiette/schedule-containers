@@ -45,7 +45,7 @@ func setupTestServer(t *testing.T) (*Server, *mockSchedulerService) {
 	cfg := &config.Config{WebHost: "127.0.0.1", WebPort: 0}
 
 	dockerClient, _ := docker.NewClient("unix:///var/run/docker.sock")
-	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc)
+	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, nil)
 	return srv, mockSched
 }
 
