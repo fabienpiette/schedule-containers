@@ -33,8 +33,6 @@ type HealthResult struct {
 	OnDemandURL string `json:"on_demand_url"`
 }
 
-type idleTracker struct{}
-
 type OnDemandManager struct {
 	docker    OnDemandDockerClient
 	store     *store.Store
@@ -81,7 +79,18 @@ func (m *OnDemandManager) Start(ctx context.Context) error {
 				continue
 			}
 			if running {
-				slog.Info("on-demand: container running, would start idle tracker", "container", s.ContainerName)
+				tracker := newIdleTracker(s.ContainerName, s.IdleTimeout(), m.docker)
+				if tracker != nil {
+					containerName := s.ContainerName
+					tracker.start(ctx, func() {
+						m.mu.Lock()
+						delete(m.trackers, containerName)
+						delete(m.schedules, containerName)
+						m.mu.Unlock()
+					})
+					m.trackers[s.ContainerName] = tracker
+					slog.Info("on-demand: started idle tracker", "container", s.ContainerName, "timeout", s.IdleTimeout())
+				}
 			}
 		}
 	}
@@ -108,6 +117,9 @@ func (m *OnDemandManager) Stop() {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
+		for _, t := range trackers {
+			t.stop()
+		}
 	}()
 
 	select {
@@ -127,7 +139,33 @@ func (m *OnDemandManager) Watch(schedule *models.Schedule) {
 	slog.Info("on-demand: watching schedule", "container", schedule.ContainerName)
 
 	if schedule.IdleTimeoutSec > 0 {
-		slog.Debug("on-demand: idle tracker start stub", "container", schedule.ContainerName)
+		if existing, ok := m.trackers[schedule.ContainerName]; ok {
+			existing.stop()
+			delete(m.trackers, schedule.ContainerName)
+		}
+
+		running, err := m.docker.IsRunning(context.Background(), schedule.ContainerName)
+		if err != nil {
+			slog.Warn("on-demand: failed to check running state for idle tracker", "container", schedule.ContainerName, "error", err)
+			return
+		}
+		if !running {
+			slog.Debug("on-demand: container not running, skipping idle tracker", "container", schedule.ContainerName)
+			return
+		}
+
+		tracker := newIdleTracker(schedule.ContainerName, schedule.IdleTimeout(), m.docker)
+		if tracker != nil {
+			containerName := schedule.ContainerName
+			tracker.start(context.Background(), func() {
+				m.mu.Lock()
+				delete(m.trackers, containerName)
+				delete(m.schedules, containerName)
+				m.mu.Unlock()
+			})
+			m.trackers[schedule.ContainerName] = tracker
+			slog.Info("on-demand: started idle tracker", "container", schedule.ContainerName, "timeout", schedule.IdleTimeout())
+		}
 	}
 }
 
@@ -135,8 +173,11 @@ func (m *OnDemandManager) Unwatch(containerName string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if tracker, ok := m.trackers[containerName]; ok {
+		tracker.stop()
+		delete(m.trackers, containerName)
+	}
 	delete(m.schedules, containerName)
-	delete(m.trackers, containerName)
 	slog.Info("on-demand: unwatched container", "container", containerName)
 }
 
