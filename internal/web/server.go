@@ -28,22 +28,32 @@ type SchedulerService interface {
 	ScheduleCount() int
 }
 
+type OnDemandService interface {
+	WakeContainer(ctx context.Context, containerName string) (*ondemand.WakeResult, error)
+	CheckHealth(ctx context.Context, containerName string) (*ondemand.HealthResult, error)
+	Watch(schedule *models.Schedule)
+	Unwatch(containerName string)
+}
+
 type Server struct {
 	httpServer    *http.Server
 	store         *store.Store
 	docker        *docker.Client
 	scheduler     SchedulerService
 	presetService *cronpresets.Service
-	ondemand      *ondemand.OnDemandManager
+	ondemand      OnDemandService
 	templates     map[string]*template.Template
 }
 
 //go:embed templates/* static/*
 var embeddedFS embed.FS
 
-var _ SchedulerService = (*scheduler.Scheduler)(nil)
+var (
+	_ SchedulerService = (*scheduler.Scheduler)(nil)
+	_ OnDemandService  = (*ondemand.OnDemandManager)(nil)
+)
 
-func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service, odm *ondemand.OnDemandManager) *Server {
+func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service, odm OnDemandService) *Server {
 	baseFiles := []string{
 		"templates/layout.html",
 		"templates/partials.html",
@@ -62,7 +72,8 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		templates[name] = template.Must(template.New("").ParseFS(embeddedFS, files...))
 	}
 
-	templates["wake.html"] = template.Must(template.New("").ParseFS(embeddedFS, "templates/wake.html"))
+	wakeContent, _ := embeddedFS.ReadFile("templates/wake.html")
+	templates["wake.html"] = template.Must(template.New("wake.html").Parse(string(wakeContent)))
 
 	srv := &Server{
 		store:         s,
