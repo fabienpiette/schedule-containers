@@ -210,14 +210,17 @@ func (s *Server) apiToggleSchedule(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		sv := ScheduleView{
-			ID:            toggled.ID,
-			ContainerName: toggled.ContainerName,
-			DisplayName:   toggled.DisplayName,
-			StackName:     toggled.StackName,
-			StartCron:     toggled.StartCron,
-			StopCron:      toggled.StopCron,
-			Enabled:       toggled.Enabled,
-			TagName:       tagName,
+			ID:              toggled.ID,
+			ContainerName:   toggled.ContainerName,
+			DisplayName:     toggled.DisplayName,
+			StackName:       toggled.StackName,
+			StartCron:       toggled.StartCron,
+			StopCron:        toggled.StopCron,
+			Enabled:         toggled.Enabled,
+			OnDemandEnabled: toggled.OnDemandEnabled,
+			OnDemandURL:     toggled.OnDemandURL,
+			IdleTimeoutSec:  toggled.IdleTimeoutSec,
+			TagName:         tagName,
 		}
 		w.Header().Set("X-Toast-Message", "Schedule%20toggled")
 		s.renderPartial(w, "schedule-row", sv)

@@ -62,6 +62,8 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		templates[name] = template.Must(template.New("").ParseFS(embeddedFS, files...))
 	}
 
+	templates["wake.html"] = template.Must(template.New("").ParseFS(embeddedFS, "templates/wake.html"))
+
 	srv := &Server{
 		store:         s,
 		docker:        d,
@@ -133,6 +135,19 @@ func (s *Server) renderPage(w http.ResponseWriter, name string, data any) {
 	}
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
 		slog.Error("failed to render page", "name", name, "error", err)
+		return
+	}
+}
+
+func (s *Server) renderStandalone(w http.ResponseWriter, name string, data any) {
+	t, ok := s.templates[name]
+	if !ok {
+		slog.Error("standalone template not found", "name", name)
+		http.Error(w, "template not found", http.StatusInternalServerError)
+		return
+	}
+	if err := t.Execute(w, data); err != nil {
+		slog.Error("failed to render standalone page", "name", name, "error", err)
 		return
 	}
 }

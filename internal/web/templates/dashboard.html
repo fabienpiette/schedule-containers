@@ -32,6 +32,7 @@
             <th>Stack</th>
             <th>Schedule</th>
             <th>Tag</th>
+            <th>On-Demand</th>
             <th>Status</th>
             <th>Actions</th>
         </tr>
@@ -43,6 +44,7 @@
             <td class="muted">{{.StackName}}</td>
             <td><span class="cron">{{.StartCron}}</span> <span class="arrow">&rarr;</span> <span class="cron">{{.StopCron}}</span></td>
             <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}</span>{{else}}<span class="muted">-</span>{{end}}</td>
+            <td>{{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{else}}<span class="muted">-</span>{{end}}</td>
             <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
             <td class="cell-actions">
                 <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
@@ -50,7 +52,7 @@
             </td>
         </tr>
         {{else}}
-        <tr><td colspan="6" class="muted">No schedules configured</td></tr>
+        <tr><td colspan="7" class="muted">No schedules configured</td></tr>
         {{end}}
     </tbody>
 </table>

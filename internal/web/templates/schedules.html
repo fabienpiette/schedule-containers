@@ -32,6 +32,21 @@
     <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5" required>
     <small>Standard 5-field format: min hour day month weekday</small>
 
+    <fieldset class="form-group">
+        <label>
+            <input type="checkbox" name="on_demand_enabled" id="on_demand_enabled"> Enable wake-on-access
+        </label>
+        <div id="ondemand-fields" style="display:none;">
+            <label for="on_demand_url">Destination URL</label>
+            <input type="text" name="on_demand_url" id="on_demand_url" class="form-input" placeholder="https://app.example.com">
+            <small>URL to redirect to after container is ready</small>
+
+            <label for="idle_timeout_sec">Idle timeout (seconds)</label>
+            <input type="text" name="idle_timeout_sec" id="idle_timeout_sec" class="form-input" placeholder="1800" value="0">
+            <small>Stop container after this many seconds of inactivity (0 = disabled)</small>
+        </div>
+    </fieldset>
+
     <label>
         <input type="checkbox" name="enabled" checked> Enabled
     </label>
@@ -48,6 +63,7 @@
             <th>Stack</th>
             <th>Schedule</th>
             <th>Tag</th>
+            <th>On-Demand</th>
             <th>Status</th>
             <th>Actions</th>
         </tr>
@@ -59,6 +75,7 @@
             <td class="muted">{{.StackName}}</td>
             <td><span class="cron">{{.StartCron}}</span> <span class="arrow">&rarr;</span> <span class="cron">{{.StopCron}}</span></td>
             <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}</span>{{else}}<span class="muted">-</span>{{end}}</td>
+            <td>{{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{else}}<span class="muted">-</span>{{end}}</td>
             <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
             <td class="cell-actions">
                 <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
@@ -66,7 +83,7 @@
             </td>
         </tr>
         {{else}}
-        <tr><td colspan="6" class="muted">No schedules configured</td></tr>
+        <tr><td colspan="7" class="muted">No schedules configured</td></tr>
         {{end}}
     </tbody>
 </table>
@@ -117,7 +134,10 @@ document.getElementById('schedule-form').addEventListener('submit', function(e) 
         display_name: form.display_name.value,
         start_cron: form.start_cron.value,
         stop_cron: form.stop_cron.value,
-        enabled: form.enabled.checked
+        enabled: form.enabled.checked,
+        on_demand_enabled: form.on_demand_enabled.checked,
+        on_demand_url: form.on_demand_url.value,
+        idle_timeout_sec: parseInt(form.idle_timeout_sec.value) || 0
     };
     fetch('/api/schedules', {
         method: 'POST',
@@ -133,6 +153,10 @@ document.getElementById('schedule-form').addEventListener('submit', function(e) 
     }).catch(function(err) {
         showToast(err.message, 'error');
     });
+});
+
+document.getElementById('on_demand_enabled').addEventListener('change', function() {
+    document.getElementById('ondemand-fields').style.display = this.checked ? '' : 'none';
 });
 </script>
 {{end}}

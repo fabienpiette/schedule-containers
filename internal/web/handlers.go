@@ -34,7 +34,15 @@ type ScheduleView struct {
 	StopCron        string
 	Enabled         bool
 	OnDemandEnabled bool
+	OnDemandURL     string
+	IdleTimeoutSec  int
 	TagName         string
+}
+
+type WakeData struct {
+	Title         string
+	ContainerName string
+	OnDemandURL   string
 }
 
 type ContainerView struct {
@@ -115,6 +123,8 @@ func buildScheduleViews(schedules []models.Schedule, tagCache map[string]string)
 			StopCron:        sched.StopCron,
 			Enabled:         sched.Enabled,
 			OnDemandEnabled: sched.OnDemandEnabled,
+			OnDemandURL:     sched.OnDemandURL,
+			IdleTimeoutSec:  sched.IdleTimeoutSec,
 		}
 		if sched.TagID != nil {
 			sv.TagName = tagCache[*sched.TagID]
@@ -333,14 +343,11 @@ func (s *Server) handleWake(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := map[string]string{
-		"ContainerName": containerName,
-		"OnDemandURL":   result.OnDemandURL,
-		"Status":        "starting",
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Waking %s</title></head><body><h1>Starting %s</h1><p>Container is starting. <a href="/wake/%s/status">Check status</a></p><script>setTimeout(function(){ fetch('/wake/%s/status', {headers:{'Accept':'text/html'}}).then(function(r){ if(r.headers.get('HX-Redirect')) window.location=r.headers.get('HX-Redirect'); else setTimeout(arguments.callee,2000); }); }, 2000);</script></body></html>`,
-		data["ContainerName"], data["ContainerName"], data["ContainerName"], data["ContainerName"])
+	s.renderStandalone(w, "wake.html", WakeData{
+		Title:         "Waking " + containerName,
+		ContainerName: containerName,
+		OnDemandURL:   result.OnDemandURL,
+	})
 }
 
 func (s *Server) handleWakeStatus(w http.ResponseWriter, r *http.Request) {
