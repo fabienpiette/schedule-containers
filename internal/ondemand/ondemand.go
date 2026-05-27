@@ -247,9 +247,17 @@ func (m *OnDemandManager) CheckHealth(ctx context.Context, containerName string)
 		return &HealthResult{Healthy: true, OnDemandURL: schedule.OnDemandURL}, nil
 	}
 
-	if !health.HealthCheckDefined && len(health.Ports) > 0 {
-		port := selectPort(schedule.OnDemandURL, health.Ports)
-		addr := net.JoinHostPort(containerName, fmt.Sprintf("%d", port))
+	if !health.HealthCheckDefined && (len(health.HostPorts) > 0 || len(health.Ports) > 0) {
+		var host string
+		var port uint16
+		if len(health.HostPorts) > 0 {
+			host = "127.0.0.1"
+			port = selectPort(schedule.OnDemandURL, health.HostPorts)
+		} else {
+			host = containerName
+			port = selectPort(schedule.OnDemandURL, health.Ports)
+		}
+		addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 		conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 		if err == nil {
 			conn.Close()

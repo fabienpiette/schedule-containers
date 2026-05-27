@@ -96,6 +96,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	r.Get("/presets", srv.handlePresets)
 	r.Get("/tags", srv.handleTags)
 	r.Get("/wake/{name}", srv.handleWake)
+	r.Get("/wake/{name}/", srv.handleWake)
 	r.Get("/wake/{name}/status", srv.handleWakeStatus)
 
 	r.Route("/api", func(r chi.Router) {

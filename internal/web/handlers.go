@@ -364,7 +364,7 @@ func (s *Server) handleWakeStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if wantsHTML(r) {
+	if r.Header.Get("HX-Request") == "true" || wantsHTML(r) {
 		if result.Healthy {
 			w.Header().Set("HX-Redirect", result.OnDemandURL)
 			w.WriteHeader(http.StatusOK)

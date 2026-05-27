@@ -11,8 +11,9 @@ import (
 )
 
 type ContainerHealth struct {
-	Status            string
-	Ports             []uint16
+	Status             string
+	Ports              []uint16 // container-internal ports (for Docker-network probe)
+	HostPorts          []uint16 // host-published ports (for host-level probe)
 	HealthCheckDefined bool
 }
 
@@ -45,10 +46,34 @@ func (c *Client) InspectContainer(ctx context.Context, name string) (*ContainerH
 		h.HealthCheckDefined = true
 	}
 
-	ports := collectTCPPorts(inspect.Config, inspect.NetworkSettings)
-	h.Ports = ports
+	h.Ports = collectTCPPorts(inspect.Config, inspect.NetworkSettings)
+	h.HostPorts = collectHostPorts(inspect.NetworkSettings)
 
 	return h, nil
+}
+
+func collectHostPorts(netSettings *container.NetworkSettings) []uint16 {
+	if netSettings == nil {
+		return nil
+	}
+	seen := make(map[uint16]bool)
+	for p, bindings := range netSettings.Ports {
+		if p.Proto() != "tcp" {
+			continue
+		}
+		for _, b := range bindings {
+			if b.HostPort != "" {
+				if v, err := parseUint16(b.HostPort); err == nil {
+					seen[v] = true
+				}
+			}
+		}
+	}
+	result := make([]uint16, 0, len(seen))
+	for p := range seen {
+		result = append(result, p)
+	}
+	return result
 }
 
 func collectTCPPorts(config *container.Config, netSettings *container.NetworkSettings) []uint16 {
