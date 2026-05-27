@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/gndm/schedule-containers/internal/ondemand"
 	"github.com/gndm/schedule-containers/internal/scheduler"
 	"github.com/gndm/schedule-containers/internal/yamlconfig"
 )
@@ -102,6 +104,10 @@ func (s *Server) apiCreateSchedule(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if created.OnDemandEnabled {
+		s.ondemand.Watch(created)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(created)
@@ -145,6 +151,13 @@ func (s *Server) apiUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if existing.OnDemandEnabled {
+		s.ondemand.Unwatch(existing.ContainerName)
+	}
+	if updated.OnDemandEnabled {
+		s.ondemand.Watch(updated)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(updated)
 }
@@ -152,12 +165,23 @@ func (s *Server) apiUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiDeleteSchedule(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
+	schedule, err := s.store.GetSchedule(r.Context(), id)
+	if err != nil {
+		http.Error(w, "schedule not found", http.StatusNotFound)
+		return
+	}
+
 	if err := s.store.DeleteSchedule(r.Context(), id); err != nil {
 		http.Error(w, "schedule not found", http.StatusNotFound)
 		return
 	}
 
 	s.scheduler.RemoveSchedule(id)
+
+	if schedule.OnDemandEnabled {
+		s.ondemand.Unwatch(schedule.ContainerName)
+	}
+
 	s.respondNoContent(w, r, "Schedule%20deleted")
 }
 
@@ -709,4 +733,40 @@ func (s *Server) apiRemoveTagFromContainer(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) apiContainerHealth(w http.ResponseWriter, r *http.Request) {
+	containerName := chi.URLParam(r, "name")
+
+	result, err := s.ondemand.CheckHealth(r.Context(), containerName)
+	if err != nil {
+		if errors.Is(err, ondemand.ErrScheduleNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		slog.Error("health check failed", "container", containerName, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"healthy": result.Healthy,
+		"url":     result.OnDemandURL,
+	})
+}
+
+func (s *Server) apiWakeURL(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	schedule, err := s.store.GetSchedule(r.Context(), id)
+	if err != nil {
+		http.Error(w, "schedule not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"wake_url": "/wake/" + schedule.ContainerName + "/",
+	})
 }

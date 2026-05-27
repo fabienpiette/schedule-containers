@@ -2,6 +2,7 @@ package ondemand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -14,6 +15,8 @@ import (
 	"github.com/gndm/schedule-containers/internal/models"
 	"github.com/gndm/schedule-containers/internal/store"
 )
+
+var ErrScheduleNotFound = errors.New("no on-demand schedule found for container")
 
 type OnDemandDockerClient interface {
 	StartContainer(ctx context.Context, name string) error
@@ -205,7 +208,7 @@ func (m *OnDemandManager) WakeContainer(ctx context.Context, containerName strin
 	m.mu.Unlock()
 
 	if !ok {
-		return nil, fmt.Errorf("no on-demand schedule found for container %q", containerName)
+		return nil, ErrScheduleNotFound
 	}
 
 	running, err := m.docker.IsRunning(ctx, containerName)
@@ -232,7 +235,7 @@ func (m *OnDemandManager) CheckHealth(ctx context.Context, containerName string)
 	m.mu.Unlock()
 
 	if !ok {
-		return nil, fmt.Errorf("no on-demand schedule found for container %q", containerName)
+		return nil, ErrScheduleNotFound
 	}
 
 	health, err := m.docker.InspectContainer(ctx, containerName)

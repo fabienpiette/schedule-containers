@@ -2,9 +2,16 @@ package web
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/gndm/schedule-containers/internal/ondemand"
 )
 
 type DashboardData struct {
@@ -304,5 +311,66 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 		Tags:            tagViews,
 		Containers:      containerNames,
 		ContainerStates: containerStates,
+	})
+}
+
+func (s *Server) handleWake(w http.ResponseWriter, r *http.Request) {
+	containerName := chi.URLParam(r, "name")
+
+	result, err := s.ondemand.WakeContainer(r.Context(), containerName)
+	if err != nil {
+		if errors.Is(err, ondemand.ErrScheduleNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		slog.Error("wake container failed", "container", containerName, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if result.Running {
+		http.Redirect(w, r, result.OnDemandURL, http.StatusFound)
+		return
+	}
+
+	data := map[string]string{
+		"ContainerName": containerName,
+		"OnDemandURL":   result.OnDemandURL,
+		"Status":        "starting",
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Waking %s</title></head><body><h1>Starting %s</h1><p>Container is starting. <a href="/wake/%s/status">Check status</a></p><script>setTimeout(function(){ fetch('/wake/%s/status', {headers:{'Accept':'text/html'}}).then(function(r){ if(r.headers.get('HX-Redirect')) window.location=r.headers.get('HX-Redirect'); else setTimeout(arguments.callee,2000); }); }, 2000);</script></body></html>`,
+		data["ContainerName"], data["ContainerName"], data["ContainerName"], data["ContainerName"])
+}
+
+func (s *Server) handleWakeStatus(w http.ResponseWriter, r *http.Request) {
+	containerName := chi.URLParam(r, "name")
+
+	result, err := s.ondemand.CheckHealth(r.Context(), containerName)
+	if err != nil {
+		if errors.Is(err, ondemand.ErrScheduleNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		slog.Error("health check failed", "container", containerName, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if wantsHTML(r) {
+		if result.Healthy {
+			w.Header().Set("HX-Redirect", result.OnDemandURL)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, "<span>Still starting...</span>")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"healthy": result.Healthy,
+		"url":     result.OnDemandURL,
 	})
 }
