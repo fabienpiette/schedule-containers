@@ -32,23 +32,47 @@
     <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5" required>
     <small>Standard 5-field format: min hour day month weekday</small>
 
-    <fieldset class="form-group">
-        <label>
-            <input type="checkbox" name="on_demand_enabled" id="on_demand_enabled"> Enable wake-on-access
-        </label>
-        <div id="ondemand-fields" style="display:none;">
-            <label for="on_demand_url">Destination URL</label>
-            <input type="text" name="on_demand_url" id="on_demand_url" class="form-input" placeholder="https://app.example.com">
-            <small>URL to redirect to after container is ready</small>
-
-            <label for="idle_timeout_sec">Idle timeout (seconds)</label>
-            <input type="text" name="idle_timeout_sec" id="idle_timeout_sec" class="form-input" placeholder="1800" value="0">
-            <small>Stop container after this many seconds of inactivity (0 = disabled)</small>
+    <div class="ondemand-panel" id="ondemand-panel">
+        <div class="ondemand-header">
+            <div class="ondemand-header-left">
+                <svg class="ondemand-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                    <path d="M7.5 1.5v4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M5 3.5A5.5 5.5 0 1010 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                </svg>
+                <div class="ondemand-header-text">
+                    <span class="ondemand-title">Wake-on-Access</span>
+                    <span class="ondemand-desc">Start on request · stop when idle</span>
+                </div>
+            </div>
+            <label class="toggle-switch" title="Enable wake-on-access">
+                <input type="checkbox" name="on_demand_enabled" id="on_demand_enabled">
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
         </div>
-    </fieldset>
+        <div class="ondemand-body" id="ondemand-fields">
+            <div class="ondemand-body-inner">
+                <div class="ondemand-fields-grid">
+                    <div class="ondemand-field">
+                        <label for="on_demand_url" class="field-label">Destination URL</label>
+                        <input type="text" name="on_demand_url" id="on_demand_url" class="form-input" placeholder="https://app.example.com">
+                        <small>Redirect target once container is ready</small>
+                    </div>
+                    <div class="ondemand-field">
+                        <label for="idle_timeout_sec" class="field-label">Idle Timeout</label>
+                        <div class="input-suffix-wrap">
+                            <input type="number" name="idle_timeout_sec" id="idle_timeout_sec" class="form-input" placeholder="1800" value="0" min="0">
+                            <span class="input-suffix">seconds</span>
+                        </div>
+                        <small>Auto-stop after inactivity · 0 = disabled</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <label>
-        <input type="checkbox" name="enabled" checked> Enabled
+    <label class="check-label">
+        <input type="checkbox" name="enabled" checked>
+        <span>Enabled</span>
     </label>
 
     <button type="submit" class="btn-primary">Create Schedule</button>
@@ -156,7 +180,15 @@ document.getElementById('schedule-form').addEventListener('submit', function(e) 
 });
 
 document.getElementById('on_demand_enabled').addEventListener('change', function() {
-    document.getElementById('ondemand-fields').style.display = this.checked ? '' : 'none';
+    var body = document.getElementById('ondemand-fields');
+    var panel = document.getElementById('ondemand-panel');
+    if (this.checked) {
+        body.classList.add('expanded');
+        panel.classList.add('is-enabled');
+    } else {
+        body.classList.remove('expanded');
+        panel.classList.remove('is-enabled');
+    }
 });
 </script>
 {{end}}
