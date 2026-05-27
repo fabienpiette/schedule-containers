@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -90,6 +91,16 @@ func (s *Server) apiCreateSchedule(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid stop_cron: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	if req.OnDemandEnabled {
+		if req.OnDemandURL == "" {
+			http.Error(w, "on_demand_url is required when on_demand_enabled is true", http.StatusBadRequest)
+			return
+		}
+		if _, err := url.Parse(req.OnDemandURL); err != nil {
+			http.Error(w, "invalid on_demand_url: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 
 	created, err := s.store.CreateSchedule(r.Context(), &req)
 	if err != nil {
@@ -135,6 +146,17 @@ func (s *Server) apiUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 	if req.TagID != nil && (req.StartCron != existing.StartCron || req.StopCron != existing.StopCron) {
 		http.Error(w, "Cannot edit cron on tag-derived schedule; update the tag instead", http.StatusBadRequest)
 		return
+	}
+
+	if req.OnDemandEnabled {
+		if req.OnDemandURL == "" {
+			http.Error(w, "on_demand_url is required when on_demand_enabled is true", http.StatusBadRequest)
+			return
+		}
+		if _, err := url.Parse(req.OnDemandURL); err != nil {
+			http.Error(w, "invalid on_demand_url: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	updated, err := s.store.UpdateSchedule(r.Context(), &req)
