@@ -14,11 +14,11 @@ docker compose up -d
 ## Features
 
 - **Cron scheduling** — Start and stop containers on any 5-field cron expression (`0 8 * * 1-5` = weekdays at 8am)
+- **On-demand wake** — Wake stopped containers on access via `/wake/<container>/`, auto-redirect when healthy
+- **Inactivity auto-stop** — Stop containers after configurable idle timeout (monitors CPU and network activity)
 - **Tags** — Reusable schedule templates applied to multiple containers at once
 - **Web dashboard** — Go templates + HTMX with dark/light theme, inline actions, toast notifications
 - **REST API** — Full CRUD for schedules, tags, presets; container start/stop; YAML import/export
-- **Per-container locking** — Concurrent cron jobs targeting the same container are serialized
-- **Single binary** — Templates, static assets, and default presets embedded via `//go:embed`
 
 ## Install
 
@@ -53,6 +53,24 @@ schedule-containers schedule export schedules.yaml                 # Export
 schedule-containers schedule import schedules.yaml --dry-run        # Import (dry-run)
 ```
 
+### On-Demand Wake
+
+Configure a Caddy reverse proxy to redirect to the wake URL when the upstream is down:
+
+```caddy
+app.example.com {
+    reverse_proxy app:8080
+    handle_errors {
+        @is_down expression {http.error.status_code} in [502, 503]
+        handle @is_down {
+            redir https://schedule-containers.example.com/wake/app/ permanent
+        }
+    }
+}
+```
+
+When a user accesses the container's URL while it's stopped, they're redirected to the wake page. The container starts, a health check runs, and the user is redirected to the running service.
+
 ### API
 
 ```bash
@@ -60,13 +78,17 @@ curl -X POST http://localhost:8080/api/schedules \
   -H "Content-Type: application/json" \
   -d '{"container_name":"my-app","start_cron":"0 8 * * 1-5","stop_cron":"0 18 * * 1-5","enabled":true}'
 
-curl -X POST http://localhost:8080/api/containers/my-app/start
-curl http://localhost:8080/api/export -o config.yaml
+curl -X POST http://localhost:8080/api/schedules \
+  -H "Content-Type: application/json" \
+  -d '{"container_name":"my-app","start_cron":"0 8 * * 1-5","stop_cron":"0 18 * * 1-5","on_demand_enabled":true,"on_demand_url":"https://app.example.com","idle_timeout_sec":1800}'
+
+curl http://localhost:8080/api/containers/my-app/health
+curl http://localhost:8080/api/schedules/{id}/wake-url
 ```
 
 ### Dashboard
 
-Open `http://localhost:8080` — view containers, manage schedules, start/stop containers, create and apply tags.
+Open `http://localhost:8080` — view containers, manage schedules, start/stop containers, create and apply tags, configure on-demand wake.
 
 For all options: `schedule-containers --help`
 
@@ -83,8 +105,8 @@ For all options: `schedule-containers --help`
 
 ## Known Issues
 
-- **No authentication** — designed for private networks behind a reverse proxy (Caddy, Nginx)
-- **Docker socket access** — grants full container control; consider `tecnativa/docker-socket-proxy` for restricted access
+- **No authentication** — All endpoints, including `/wake/`, are unauthenticated. Designed for private networks behind a reverse proxy (Caddy, Nginx)
+- **Docker socket access** — Grants full container control; consider `tecnativa/docker-socket-proxy` for restricted access
 - **CLI doesn't hot-reload** — `schedule add` writes directly to SQLite; a running server picks up changes on restart
 
 ## Documentation
