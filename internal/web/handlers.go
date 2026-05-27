@@ -373,7 +373,7 @@ func (s *Server) handleWakeStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprint(w, "<span>Still starting...</span>")
+		fmt.Fprint(w, `<span class="log-line">service not ready yet — polling</span>`)
 		return
 	}
 

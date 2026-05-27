@@ -4,78 +4,384 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:           #090f1a;
+            --surface:      #0d1625;
+            --surface-2:    #111e32;
+            --border:       #18273d;
+            --border-glow:  rgba(29, 99, 237, 0.2);
+            --accent:       #1D63ED;
+            --accent-dim:   rgba(29, 99, 237, 0.12);
+            --text:         #c9d8e8;
+            --text-dim:     #8fa3b8;
+            --muted:        #445566;
+            --success:      #3fb950;
+            --error:        #f85149;
+            --mono:         'IBM Plex Mono', 'Courier New', monospace;
+        }
+
         body {
-            font-family: Inter, system-ui, -apple-system, sans-serif;
-            font-size: 14px;
-            line-height: 1.5;
-            background: #0d1b2a;
-            color: #e6edf3;
+            font-family: var(--mono);
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;
         }
-        .wake-container {
-            text-align: center;
-            max-width: 400px;
-            padding: 2rem;
+
+        /* Grid overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(29,99,237,0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(29,99,237,0.035) 1px, transparent 1px);
+            background-size: 44px 44px;
+            pointer-events: none;
+            z-index: 0;
         }
-        .wake-container h1 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #1D63ED;
-            margin-bottom: 1rem;
+
+        /* Central atmospheric glow */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(ellipse at center, rgba(29,99,237,0.07) 0%, transparent 65%);
+            pointer-events: none;
+            z-index: 0;
         }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #1b2838;
-            border-top: 3px solid #1D63ED;
+
+        /* ── Card ── */
+        .wake-card {
+            position: relative;
+            z-index: 1;
+            width: min(460px, calc(100vw - 2rem));
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow:
+                0 0 0 1px var(--border-glow),
+                0 32px 80px rgba(0,0,0,0.5),
+                0 0 60px rgba(29,99,237,0.04);
+            animation: card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        /* macOS-style titlebar */
+        .wake-titlebar {
+            display: flex;
+            align-items: center;
+            padding: 0.6rem 0.875rem;
+            background: rgba(0,0,0,0.25);
+            border-bottom: 1px solid var(--border);
+            gap: 0.5rem;
+        }
+
+        .titlebar-dots {
+            display: flex;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+
+        .titlebar-dots span {
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 1.5rem auto;
+            background: var(--border);
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+
+        .titlebar-text {
+            flex: 1;
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            /* offset to visually center past the dots */
+            margin-right: 30px;
         }
-        .error {
-            color: #f85149;
-            margin-top: 1rem;
+
+        /* ── Body ── */
+        .wake-body {
+            padding: 2.25rem 2rem 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .error a {
-            color: #1D63ED;
+
+        /* $ wake <name> command line */
+        .wake-command {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.78rem;
+            margin-bottom: 2rem;
+            letter-spacing: 0.02em;
+        }
+
+        .cmd-prompt {
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .cmd-verb { color: var(--text-dim); }
+
+        .cmd-target {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 7px;
+            height: 15px;
+            background: var(--accent);
+            border-radius: 1px;
+            vertical-align: middle;
+            animation: cursor-blink 1.1s step-end infinite;
+            margin-left: 1px;
+        }
+
+        /* ── Spinner ── */
+        .wake-spinner {
+            position: relative;
+            width: 88px;
+            height: 88px;
+            margin-bottom: 1.5rem;
+        }
+
+        .wake-spinner svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        .ring-outer {
+            transform-origin: 50px 50px;
+            animation: ring-pulse 2.6s ease-in-out infinite;
+        }
+
+        .ring-track {
+            /* static dim ring */
+        }
+
+        .ring-arc {
+            stroke-linecap: round;
+            transform-origin: 50px 50px;
+            animation: arc-spin 1.6s linear infinite;
+            filter: drop-shadow(0 0 5px rgba(29,99,237,0.7));
+        }
+
+        .wake-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--accent);
+            opacity: 0.45;
+        }
+
+        /* ── Name + elapsed ── */
+        .wake-name {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.01em;
+            margin-bottom: 0.3rem;
+        }
+
+        .wake-elapsed {
+            font-size: 0.7rem;
+            color: var(--muted);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Status log ── */
+        .wake-status-wrap {
+            margin-top: 1.75rem;
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            min-height: 2.4rem;
+            display: flex;
+            align-items: center;
+        }
+
+        #status {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            width: 100%;
+        }
+
+        .log-line {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .log-line::before {
+            content: '▸';
+            color: var(--accent);
+            opacity: 0.7;
+            flex-shrink: 0;
+        }
+
+        .wake-error {
+            font-size: 0.75rem;
+            color: var(--error);
+            text-align: center;
+            width: 100%;
+        }
+
+        .wake-error a {
+            color: var(--accent);
             text-decoration: none;
         }
-        .error a:hover {
-            text-decoration: underline;
+        .wake-error a:hover { text-decoration: underline; }
+
+        /* ── Footer ── */
+        .wake-footer {
+            padding: 0.6rem 1rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        .muted {
-            color: #8899aa;
+
+        .footer-brand {
+            font-size: 0.6rem;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .footer-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: dot-pulse 1.8s ease-in-out infinite;
+        }
+
+        /* ── Animations ── */
+        @keyframes card-in {
+            from { opacity: 0; transform: translateY(14px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0)   scale(1); }
+        }
+
+        @keyframes arc-spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        @keyframes ring-pulse {
+            0%, 100% { opacity: 0.1;  transform: scale(1); }
+            50%       { opacity: 0.28; transform: scale(1.07); }
+        }
+
+        @keyframes cursor-blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0; }
+        }
+
+        @keyframes dot-pulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50%       { opacity: 1;   transform: scale(1.3); }
         }
     </style>
 </head>
 <body>
-    <div class="wake-container">
-        <h1>Starting {{.ContainerName}}</h1>
-        <div class="spinner"></div>
-        <div id="status" class="muted">Please wait...</div>
+    <div class="wake-card">
+        <div class="wake-titlebar">
+            <div class="titlebar-dots">
+                <span></span><span></span><span></span>
+            </div>
+            <div class="titlebar-text">schedule-containers</div>
+        </div>
+
+        <div class="wake-body">
+            <div class="wake-command">
+                <span class="cmd-prompt">❯</span>
+                <span class="cmd-verb">wake</span>
+                <span class="cmd-target">{{.ContainerName}}</span>
+                <span class="cursor"></span>
+            </div>
+
+            <div class="wake-spinner">
+                <svg viewBox="0 0 100 100" fill="none">
+                    <!-- Outer pulse ring -->
+                    <circle cx="50" cy="50" r="46"
+                            stroke="rgba(29,99,237,0.22)" stroke-width="1"
+                            class="ring-outer"/>
+                    <!-- Static track -->
+                    <circle cx="50" cy="50" r="38"
+                            stroke="rgba(29,99,237,0.1)" stroke-width="2.5"
+                            class="ring-track"/>
+                    <!-- Spinning arc -->
+                    <circle cx="50" cy="50" r="38"
+                            stroke="#1D63ED" stroke-width="2.5"
+                            stroke-dasharray="58 181" stroke-dashoffset="-8"
+                            class="ring-arc"/>
+                </svg>
+                <!-- Power icon -->
+                <svg class="wake-icon" width="20" height="20" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 1.5v4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    <path d="M5.2 3.6A5.5 5.5 0 1010.8 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+            </div>
+
+            <div class="wake-name">{{.ContainerName}}</div>
+            <div class="wake-elapsed" id="elapsed">0:00</div>
+
+            <div class="wake-status-wrap">
+                <div id="status">
+                    <span class="log-line">initializing wake sequence</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="wake-footer">
+            <span class="footer-brand">wake-on-access</span>
+            <span class="footer-dot"></span>
+            <span class="footer-brand">standing by</span>
+        </div>
     </div>
 
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <div hx-get="/wake/{{.ContainerName}}/status"
          hx-trigger="every 2s"
          hx-swap="innerHTML"
-         hx-target="#status">
-         Checking...
-    </div>
+         hx-target="#status"
+         style="display:none">Checking...</div>
 
     <script>
+    var start = Date.now();
+    var timer = setInterval(function() {
+        var s = Math.floor((Date.now() - start) / 1000);
+        document.getElementById('elapsed').textContent =
+            Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+    }, 500);
+
     setTimeout(function() {
+        clearInterval(timer);
         document.getElementById('status').innerHTML =
-            '<p class="error">Container did not start in time. <a href="/wake/{{.ContainerName}}/">Retry</a></p>';
+            '<span class="wake-error">timed out after 60s &mdash; <a href="/wake/{{.ContainerName}}/">retry</a></span>';
     }, 60000);
     </script>
 </body>
