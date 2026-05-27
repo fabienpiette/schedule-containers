@@ -190,18 +190,21 @@ document.getElementById('schedule-form').addEventListener('submit', function(e) 
 
 document.getElementById('on_demand_enabled').addEventListener('change', function() {
     var onDemandFields = document.getElementById('ondemand-fields');
+    var panel = document.getElementById('ondemand-panel');
     var startCron = document.getElementById('start_cron');
     var stopCron = document.getElementById('stop_cron');
     var startHint = document.getElementById('start-cron-hint');
     var stopHint = document.getElementById('stop-cron-hint');
     if (this.checked) {
-        onDemandFields.style.display = '';
+        onDemandFields.classList.add('expanded');
+        panel.classList.add('is-enabled');
         startCron.removeAttribute('required');
         stopCron.removeAttribute('required');
         startHint.textContent = 'Optional when wake-on-access is enabled. Leave empty for on-demand only.';
         stopHint.textContent = 'Optional when wake-on-access is enabled. Sets a safety-net stop time.';
     } else {
-        onDemandFields.style.display = 'none';
+        onDemandFields.classList.remove('expanded');
+        panel.classList.remove('is-enabled');
         startCron.setAttribute('required', '');
         stopCron.setAttribute('required', '');
         startHint.textContent = 'Standard 5-field format: min hour day month weekday';
