@@ -255,24 +255,18 @@ func (m *OnDemandManager) CheckHealth(ctx context.Context, containerName string)
 		return &HealthResult{Healthy: true, OnDemandURL: schedule.OnDemandURL}, nil
 	}
 
-	if !health.HealthCheckDefined && (len(health.HostPorts) > 0 || len(health.Ports) > 0) {
-		var host string
-		var port uint16
-		if len(health.HostPorts) > 0 {
-			host = "127.0.0.1"
-			port = selectPort(schedule.OnDemandURL, health.HostPorts)
-		} else {
-			host = containerName
-			port = selectPort(schedule.OnDemandURL, health.Ports)
+	if !health.HealthCheckDefined && len(health.Ports) > 0 {
+		port := selectPort(schedule.OnDemandURL, health.Ports)
+		addrs := buildProbeAddrs(health, containerName, port)
+		for _, addr := range addrs {
+			slog.Info("on-demand: TCP probe", "container", containerName, "addr", addr)
+			conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
+			if err == nil {
+				conn.Close()
+				return &HealthResult{Healthy: true, OnDemandURL: schedule.OnDemandURL}, nil
+			}
+			slog.Info("on-demand: TCP probe failed", "container", containerName, "addr", addr, "error", err)
 		}
-		addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
-		slog.Info("on-demand: TCP probe", "container", containerName, "addr", addr)
-		conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
-		if err == nil {
-			conn.Close()
-			return &HealthResult{Healthy: true, OnDemandURL: schedule.OnDemandURL}, nil
-		}
-		slog.Info("on-demand: TCP probe failed", "container", containerName, "addr", addr, "error", err)
 		return &HealthResult{Healthy: false, OnDemandURL: schedule.OnDemandURL}, nil
 	}
 
@@ -339,4 +333,23 @@ func selectPort(onDemandURL string, ports []uint16) uint16 {
 	copy(sorted, ports)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
 	return sorted[0]
+}
+
+// buildProbeAddrs returns TCP addresses to try in order:
+// 1. container IP + container port (works from host and from any Docker container)
+// 2. 127.0.0.1 + host port (works when running directly on the host with userland proxy)
+// 3. container name + container port (works within the same Docker network)
+func buildProbeAddrs(health *docker.ContainerHealth, containerName string, port uint16) []string {
+	portStr := fmt.Sprintf("%d", port)
+	var addrs []string
+
+	if health.ContainerIP != "" {
+		addrs = append(addrs, net.JoinHostPort(health.ContainerIP, portStr))
+	}
+	if len(health.HostPorts) > 0 {
+		hp := selectPort("", health.HostPorts)
+		addrs = append(addrs, net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", hp)))
+	}
+	addrs = append(addrs, net.JoinHostPort(containerName, portStr))
+	return addrs
 }

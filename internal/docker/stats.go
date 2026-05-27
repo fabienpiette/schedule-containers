@@ -12,8 +12,9 @@ import (
 
 type ContainerHealth struct {
 	Status             string
-	Ports              []uint16 // container-internal ports (for Docker-network probe)
-	HostPorts          []uint16 // host-published ports (for host-level probe)
+	ContainerIP        string   // first Docker bridge IP (reachable from host and other containers)
+	Ports              []uint16 // container-internal ports
+	HostPorts          []uint16 // host-published ports
 	HealthCheckDefined bool
 }
 
@@ -48,8 +49,21 @@ func (c *Client) InspectContainer(ctx context.Context, name string) (*ContainerH
 
 	h.Ports = collectTCPPorts(inspect.Config, inspect.NetworkSettings)
 	h.HostPorts = collectHostPorts(inspect.NetworkSettings)
+	h.ContainerIP = extractContainerIP(inspect.NetworkSettings)
 
 	return h, nil
+}
+
+func extractContainerIP(netSettings *container.NetworkSettings) string {
+	if netSettings == nil {
+		return ""
+	}
+	for _, ep := range netSettings.Networks {
+		if ep != nil && ep.IPAddress != "" {
+			return ep.IPAddress
+		}
+	}
+	return ""
 }
 
 func collectHostPorts(netSettings *container.NetworkSettings) []uint16 {
