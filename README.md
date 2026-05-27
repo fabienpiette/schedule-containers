@@ -115,7 +115,11 @@ For all options: `schedule-containers --help`
 
 ## Contributing
 
-Contributions welcome — open an issue or pull request. See [Architecture](docs/ARCHITECTURE.md) for codebase orientation and the [CLAUDE.md](CLAUDE.md) for development commands.
+Contributions welcome — open an issue or pull request. See [Architecture](docs/ARCHITECTURE.md) for codebase orientation and [CLAUDE.md](CLAUDE.md) for development commands.
+
+## Acknowledgments
+
+Thanks to all [contributors](https://github.com/gndm/schedule-containers/graphs/contributors).
 
 ## License
 

@@ -57,7 +57,7 @@ Key files: `serve.go`, `schedule.go`, `tag.go`
 
 ### `internal/models/`
 
-Pure data types: `Schedule`, `Container`, `CronPreset`, and `Tag`. No logic, no dependencies. Every other package imports this one. The `Schedule` struct includes `OnDemandEnabled`, `OnDemandURL`, and `IdleTimeoutSec` fields for Phase 2 on-demand wake.
+Pure data types: `Schedule`, `Container`, `CronPreset`, and `Tag`. No logic, no dependencies. Every other package imports this one. The `Schedule` struct includes `OnDemandEnabled`, `OnDemandURL`, `IdleTimeoutSec`, and `StartupDelaySec` fields for on-demand wake.
 
 Key files: `schedule.go`, `container.go`, `preset.go`, `tag.go`
 
@@ -105,7 +105,7 @@ Key files: `scheduler.go`
 
 ### `internal/ondemand/`
 
-On-demand wake and idle monitoring. `OnDemandManager` owns the wake lifecycle and idle tracking for containers with `OnDemandEnabled=true`. `WakeContainer` starts a stopped container and holds a per-container mutex to prevent double-starts. `CheckHealth` determines container readiness using Docker health checks, TCP port reachability, or running-state fallback. `idleTracker` goroutines stream Docker Stats for each on-demand container; when CPU and network activity stay below thresholds for the configured `IdleTimeoutSec`, the container is stopped automatically. `Watch`/`Unwatch` register and remove idle trackers when schedules are created or deleted.
+On-demand wake and idle monitoring. `OnDemandManager` owns the wake lifecycle and idle tracking for containers with `OnDemandEnabled=true`. `WakeContainer` starts a stopped container and holds a per-container mutex to prevent double-starts. `CheckHealth` waits `StartupDelaySec` (if set) then determines container readiness using Docker health checks, TCP port reachability, or running-state fallback. `idleTracker` goroutines stream Docker Stats for each on-demand container; when CPU and network activity stay below thresholds for the configured `IdleTimeoutSec`, the container is stopped automatically. `Watch`/`Unwatch` register and remove idle trackers when schedules are created or deleted.
 
 Key files: `ondemand.go`, `idle.go`
 
@@ -121,7 +121,7 @@ Key files: `server.go` (routing, setup), `api.go` (JSON endpoints + HTMX content
 
 ## Invariants
 
-- **Dependency direction:** `models` ← `config` ← `store`/`cronpresets` ← `docker` ← `scheduler` ← `ondemand` ← `web`/`cli`. No cycles. `store` and `cronpresets` are leaves; they never import from scheduler, ondemand, web, or docker.
+- **Dependency direction:** `models` ← `config` ← `store`/`cronpresets` ← `docker` ← `scheduler`/`ondemand` ← `yamlconfig` ← `web`/`cli`. No cycles. `store` and `cronpresets` are leaves; they never import from scheduler, ondemand, web, or docker. `scheduler` depends on Docker via the `DockerActionClient` interface, not direct import.
 - **Tags are linked to schedules via `tag_id`:** A nullable `tag_id` column on the `schedules` table links each schedule to its tag. Tag-derived schedules cannot have their cron expressions edited independently — update the tag instead. Deleting a tag cascades to all its schedules.
 - **Tags are persisted in SQLite** — not in YAML (presets are in YAML, tags are user data in the DB).
 - **Store is offline-only for CLI:** CLI commands write directly to SQLite. Changes made while the server is running take effect on next restart.
