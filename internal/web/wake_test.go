@@ -176,7 +176,7 @@ func TestHandleWakeStatus_NotHealthyYet(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "Still starting") {
+	if !strings.Contains(w.Body.String(), "not ready") {
 		t.Errorf("expected body to contain 'Still starting', got %s", w.Body.String())
 	}
 }

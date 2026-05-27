@@ -59,48 +59,69 @@ func (s *Scheduler) AddSchedule(schedule *models.Schedule) error {
 		return nil
 	}
 
-	if err := ValidateCronExpression(schedule.StartCron); err != nil {
-		return fmt.Errorf("invalid start cron expression: %w", err)
-	}
-	if err := ValidateCronExpression(schedule.StopCron); err != nil {
-		return fmt.Errorf("invalid stop cron expression: %w", err)
+	if schedule.StartCron == "" && schedule.StopCron == "" {
+		slog.Info("schedule has no cron expressions, not registering", "schedule_id", schedule.ID, "container", schedule.ContainerName)
+		return nil
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	containerLock := s.getOrCreateLock(schedule.ContainerName)
+	var entryIDs []cron.EntryID
 
-	startID, err := s.cron.AddFunc(schedule.StartCron, func() {
-		containerLock.Lock()
-		defer containerLock.Unlock()
-		slog.Info("cron fired: starting container", "container", schedule.ContainerName, "schedule_id", schedule.ID, "cron", schedule.StartCron)
-		if err := s.docker.StartContainer(context.Background(), schedule.ContainerName); err != nil {
-			slog.Error("failed to start container", "container", schedule.ContainerName, "error", err)
-		} else {
-			slog.Info("started container", "container", schedule.ContainerName)
+	if schedule.StartCron != "" {
+		if err := ValidateCronExpression(schedule.StartCron); err != nil {
+			return fmt.Errorf("invalid start cron expression: %w", err)
 		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to add start cron job: %w", err)
+		startID, err := s.cron.AddFunc(schedule.StartCron, func() {
+			containerLock.Lock()
+			defer containerLock.Unlock()
+			slog.Info("cron fired: starting container", "container", schedule.ContainerName, "schedule_id", schedule.ID, "cron", schedule.StartCron)
+			if err := s.docker.StartContainer(context.Background(), schedule.ContainerName); err != nil {
+				slog.Error("failed to start container", "container", schedule.ContainerName, "error", err)
+			} else {
+				slog.Info("started container", "container", schedule.ContainerName)
+			}
+		})
+		if err != nil {
+			return fmt.Errorf("failed to add start cron job: %w", err)
+		}
+		entryIDs = append(entryIDs, startID)
 	}
 
-	stopID, err := s.cron.AddFunc(schedule.StopCron, func() {
-		containerLock.Lock()
-		defer containerLock.Unlock()
-		slog.Info("cron fired: stopping container", "container", schedule.ContainerName, "schedule_id", schedule.ID, "cron", schedule.StopCron)
-		if err := s.docker.StopContainer(context.Background(), schedule.ContainerName); err != nil {
-			slog.Error("failed to stop container", "container", schedule.ContainerName, "error", err)
-		} else {
-			slog.Info("stopped container", "container", schedule.ContainerName)
+	if schedule.StopCron != "" {
+		if err := ValidateCronExpression(schedule.StopCron); err != nil {
+			for _, id := range entryIDs {
+				s.cron.Remove(id)
+			}
+			return fmt.Errorf("invalid stop cron expression: %w", err)
 		}
-	})
-	if err != nil {
-		s.cron.Remove(startID)
-		return fmt.Errorf("failed to add stop cron job: %w", err)
+		stopID, err := s.cron.AddFunc(schedule.StopCron, func() {
+			containerLock.Lock()
+			defer containerLock.Unlock()
+			slog.Info("cron fired: stopping container", "container", schedule.ContainerName, "schedule_id", schedule.ID, "cron", schedule.StopCron)
+			if err := s.docker.StopContainer(context.Background(), schedule.ContainerName); err != nil {
+				slog.Error("failed to stop container", "container", schedule.ContainerName, "error", err)
+			} else {
+				slog.Info("stopped container", "container", schedule.ContainerName)
+			}
+		})
+		if err != nil {
+			for _, id := range entryIDs {
+				s.cron.Remove(id)
+			}
+			return fmt.Errorf("failed to add stop cron job: %w", err)
+		}
+		entryIDs = append(entryIDs, stopID)
 	}
 
-	s.jobs[schedule.ID] = []cron.EntryID{startID, stopID}
+	if len(entryIDs) == 0 {
+		slog.Info("schedule has no cron expressions, not registering", "schedule_id", schedule.ID, "container", schedule.ContainerName)
+		return nil
+	}
+
+	s.jobs[schedule.ID] = entryIDs
 	slog.Info("registered cron jobs", "schedule_id", schedule.ID, "container", schedule.ContainerName, "start_cron", schedule.StartCron, "stop_cron", schedule.StopCron)
 	return nil
 }

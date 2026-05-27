@@ -79,17 +79,25 @@ func (s *Server) apiCreateSchedule(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "container_name is required", http.StatusBadRequest)
 		return
 	}
-	if req.StartCron == "" || req.StopCron == "" {
-		http.Error(w, "start_cron and stop_cron are required", http.StatusBadRequest)
+
+	hasStartCron := req.StartCron != ""
+	hasStopCron := req.StopCron != ""
+
+	if !req.OnDemandEnabled && (!hasStartCron || !hasStopCron) {
+		http.Error(w, "start_cron and stop_cron are required when on_demand_enabled is false", http.StatusBadRequest)
 		return
 	}
-	if err := scheduler.ValidateCronExpression(req.StartCron); err != nil {
-		http.Error(w, "invalid start_cron: "+err.Error(), http.StatusBadRequest)
-		return
+	if hasStartCron {
+		if err := scheduler.ValidateCronExpression(req.StartCron); err != nil {
+			http.Error(w, "invalid start_cron: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
-	if err := scheduler.ValidateCronExpression(req.StopCron); err != nil {
-		http.Error(w, "invalid stop_cron: "+err.Error(), http.StatusBadRequest)
-		return
+	if hasStopCron {
+		if err := scheduler.ValidateCronExpression(req.StopCron); err != nil {
+			http.Error(w, "invalid stop_cron: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 	if req.OnDemandEnabled {
 		if req.OnDemandURL == "" {
@@ -146,6 +154,26 @@ func (s *Server) apiUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 	if req.TagID != nil && (req.StartCron != existing.StartCron || req.StopCron != existing.StopCron) {
 		http.Error(w, "Cannot edit cron on tag-derived schedule; update the tag instead", http.StatusBadRequest)
 		return
+	}
+
+	hasStartCron := req.StartCron != ""
+	hasStopCron := req.StopCron != ""
+
+	if !req.OnDemandEnabled && (!hasStartCron || !hasStopCron) {
+		http.Error(w, "start_cron and stop_cron are required when on_demand_enabled is false", http.StatusBadRequest)
+		return
+	}
+	if hasStartCron {
+		if err := scheduler.ValidateCronExpression(req.StartCron); err != nil {
+			http.Error(w, "invalid start_cron: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if hasStopCron {
+		if err := scheduler.ValidateCronExpression(req.StopCron); err != nil {
+			http.Error(w, "invalid stop_cron: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	if req.OnDemandEnabled {

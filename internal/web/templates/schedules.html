@@ -21,16 +21,16 @@
         <option value="">-- Select a preset or type custom --</option>
     </select>
     <label for="start_cron">Start Cron Expression</label>
-    <input type="text" name="start_cron" id="start_cron" class="form-input" placeholder="0 8 * * 1-5" required>
-    <small>Standard 5-field format: min hour day month weekday</small>
+    <input type="text" name="start_cron" id="start_cron" class="form-input" placeholder="0 8 * * 1-5">
+    <small id="start-cron-hint">Standard 5-field format: min hour day month weekday</small>
 
     <label for="stop_preset">Stop Cron Preset</label>
     <select id="stop_preset" class="form-select">
         <option value="">-- Select a preset or type custom --</option>
     </select>
     <label for="stop_cron">Stop Cron Expression</label>
-    <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5" required>
-    <small>Standard 5-field format: min hour day month weekday</small>
+    <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5">
+    <small id="stop-cron-hint">Standard 5-field format: min hour day month weekday</small>
 
     <div class="ondemand-panel" id="ondemand-panel">
         <div class="ondemand-header">
@@ -189,14 +189,23 @@ document.getElementById('schedule-form').addEventListener('submit', function(e) 
 });
 
 document.getElementById('on_demand_enabled').addEventListener('change', function() {
-    var body = document.getElementById('ondemand-fields');
-    var panel = document.getElementById('ondemand-panel');
+    var onDemandFields = document.getElementById('ondemand-fields');
+    var startCron = document.getElementById('start_cron');
+    var stopCron = document.getElementById('stop_cron');
+    var startHint = document.getElementById('start-cron-hint');
+    var stopHint = document.getElementById('stop-cron-hint');
     if (this.checked) {
-        body.classList.add('expanded');
-        panel.classList.add('is-enabled');
+        onDemandFields.style.display = '';
+        startCron.removeAttribute('required');
+        stopCron.removeAttribute('required');
+        startHint.textContent = 'Optional when wake-on-access is enabled. Leave empty for on-demand only.';
+        stopHint.textContent = 'Optional when wake-on-access is enabled. Sets a safety-net stop time.';
     } else {
-        body.classList.remove('expanded');
-        panel.classList.remove('is-enabled');
+        onDemandFields.style.display = 'none';
+        startCron.setAttribute('required', '');
+        stopCron.setAttribute('required', '');
+        startHint.textContent = 'Standard 5-field format: min hour day month weekday';
+        stopHint.textContent = 'Standard 5-field format: min hour day month weekday';
     }
 });
 </script>
