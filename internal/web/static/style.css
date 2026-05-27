@@ -370,8 +370,7 @@ small { color: var(--text-secondary); }
 .dialog-overlay {
     position: fixed;
     inset: 0;
-    background: var(--bg-base);
-    opacity: 0.5;
+    background: color-mix(in srgb, var(--bg-base) 50%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
