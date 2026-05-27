@@ -242,6 +242,7 @@ func (s *Server) apiToggleSchedule(w http.ResponseWriter, r *http.Request) {
 			OnDemandEnabled: toggled.OnDemandEnabled,
 			OnDemandURL:     toggled.OnDemandURL,
 			IdleTimeoutSec:  toggled.IdleTimeoutSec,
+			StartupDelaySec: toggled.StartupDelaySec,
 			TagName:         tagName,
 		}
 		w.Header().Set("X-Toast-Message", "Schedule%20toggled")

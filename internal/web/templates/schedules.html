@@ -58,6 +58,14 @@
                         <small>Redirect target once container is ready</small>
                     </div>
                     <div class="ondemand-field">
+                        <label for="startup_delay_sec" class="field-label">Startup Delay</label>
+                        <div class="input-suffix-wrap">
+                            <input type="number" name="startup_delay_sec" id="startup_delay_sec" class="form-input" placeholder="15" value="0" min="0">
+                            <span class="input-suffix">seconds</span>
+                        </div>
+                        <small>Redirect after this many seconds of container uptime · 0 = TCP probe only</small>
+                    </div>
+                    <div class="ondemand-field">
                         <label for="idle_timeout_sec" class="field-label">Idle Timeout</label>
                         <div class="input-suffix-wrap">
                             <input type="number" name="idle_timeout_sec" id="idle_timeout_sec" class="form-input" placeholder="1800" value="0" min="0">
@@ -161,6 +169,7 @@ document.getElementById('schedule-form').addEventListener('submit', function(e) 
         enabled: form.enabled.checked,
         on_demand_enabled: form.on_demand_enabled.checked,
         on_demand_url: form.on_demand_url.value,
+        startup_delay_sec: parseInt(form.startup_delay_sec.value) || 0,
         idle_timeout_sec: parseInt(form.idle_timeout_sec.value) || 0
     };
     fetch('/api/schedules', {

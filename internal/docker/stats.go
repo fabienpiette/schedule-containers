@@ -12,9 +12,10 @@ import (
 
 type ContainerHealth struct {
 	Status             string
-	ContainerIP        string   // first Docker bridge IP (reachable from host and other containers)
-	Ports              []uint16 // container-internal ports
-	HostPorts          []uint16 // host-published ports
+	ContainerIP        string     // first Docker bridge IP (reachable from host and other containers)
+	Ports              []uint16   // container-internal ports
+	HostPorts          []uint16   // host-published ports
+	StartedAt          *time.Time // when the container process started
 	HealthCheckDefined bool
 }
 
@@ -50,6 +51,11 @@ func (c *Client) InspectContainer(ctx context.Context, name string) (*ContainerH
 	h.Ports = collectTCPPorts(inspect.Config, inspect.NetworkSettings)
 	h.HostPorts = collectHostPorts(inspect.NetworkSettings)
 	h.ContainerIP = extractContainerIP(inspect.NetworkSettings)
+	if inspect.State != nil && inspect.State.StartedAt != "" {
+		if t, err := time.Parse(time.RFC3339Nano, inspect.State.StartedAt); err == nil {
+			h.StartedAt = &t
+		}
+	}
 
 	return h, nil
 }

@@ -90,6 +90,17 @@ func (s *Store) migrate() error {
 		}
 	}
 
+	if version < 3 {
+		_, err = s.db.Exec(`
+			ALTER TABLE schedules ADD COLUMN startup_delay_sec INTEGER NOT NULL DEFAULT 0;
+			UPDATE schema_version SET version = 3;
+			INSERT OR IGNORE INTO schema_version (version) VALUES (3);
+		`)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -101,11 +112,11 @@ func (s *Store) CreateSchedule(ctx context.Context, schedule *models.Schedule) (
 	schedule.CreatedAt = now
 	schedule.UpdatedAt = now
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO schedules (id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO schedules (id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, startup_delay_sec, tag_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		schedule.ID, schedule.ContainerName, schedule.DisplayName, schedule.StackName,
 		schedule.StartCron, schedule.StopCron, schedule.Enabled,
-		schedule.OnDemandEnabled, schedule.OnDemandURL, schedule.IdleTimeoutSec,
+		schedule.OnDemandEnabled, schedule.OnDemandURL, schedule.IdleTimeoutSec, schedule.StartupDelaySec,
 		schedule.TagID, schedule.CreatedAt, schedule.UpdatedAt,
 	)
 	if err != nil {
@@ -116,14 +127,14 @@ func (s *Store) CreateSchedule(ctx context.Context, schedule *models.Schedule) (
 
 func (s *Store) GetSchedule(ctx context.Context, id string) (*models.Schedule, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, startup_delay_sec, tag_id, created_at, updated_at
 		FROM schedules WHERE id = ?`, id)
 	return scanSchedule(row)
 }
 
 func (s *Store) ListSchedules(ctx context.Context) ([]models.Schedule, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, startup_delay_sec, tag_id, created_at, updated_at
 		FROM schedules ORDER BY created_at`)
 	if err != nil {
 		return nil, err
@@ -143,11 +154,11 @@ func (s *Store) ListSchedules(ctx context.Context) ([]models.Schedule, error) {
 func (s *Store) UpdateSchedule(ctx context.Context, schedule *models.Schedule) (*models.Schedule, error) {
 	schedule.UpdatedAt = time.Now().UTC()
 	_, err := s.db.ExecContext(ctx, `
-		UPDATE schedules SET container_name=?, display_name=?, stack_name=?, start_cron=?, stop_cron=?, enabled=?, on_demand_enabled=?, on_demand_url=?, idle_timeout_sec=?, tag_id=?, updated_at=?
+		UPDATE schedules SET container_name=?, display_name=?, stack_name=?, start_cron=?, stop_cron=?, enabled=?, on_demand_enabled=?, on_demand_url=?, idle_timeout_sec=?, startup_delay_sec=?, tag_id=?, updated_at=?
 		WHERE id=?`,
 		schedule.ContainerName, schedule.DisplayName, schedule.StackName,
 		schedule.StartCron, schedule.StopCron, schedule.Enabled,
-		schedule.OnDemandEnabled, schedule.OnDemandURL, schedule.IdleTimeoutSec,
+		schedule.OnDemandEnabled, schedule.OnDemandURL, schedule.IdleTimeoutSec, schedule.StartupDelaySec,
 		schedule.TagID, schedule.UpdatedAt, schedule.ID,
 	)
 	if err != nil {
@@ -172,7 +183,7 @@ func (s *Store) ToggleSchedule(ctx context.Context, id string) (*models.Schedule
 
 func (s *Store) ListSchedulesByTag(ctx context.Context, tagID string) ([]models.Schedule, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, startup_delay_sec, tag_id, created_at, updated_at
 		FROM schedules WHERE tag_id = ? ORDER BY created_at`, tagID)
 	if err != nil {
 		return nil, err
@@ -191,7 +202,7 @@ func (s *Store) ListSchedulesByTag(ctx context.Context, tagID string) ([]models.
 
 func (s *Store) GetOnDemandSchedule(ctx context.Context, containerName string) (*models.Schedule, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, startup_delay_sec, tag_id, created_at, updated_at
 		FROM schedules WHERE container_name = ? AND on_demand_enabled = TRUE`, containerName)
 	sched, err := scanSchedule(row)
 	if err != nil {
@@ -205,7 +216,7 @@ func (s *Store) GetOnDemandSchedule(ctx context.Context, containerName string) (
 
 func (s *Store) GetScheduleByTagAndContainer(ctx context.Context, tagID, containerName string) (*models.Schedule, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, tag_id, created_at, updated_at
+		SELECT id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, startup_delay_sec, tag_id, created_at, updated_at
 		FROM schedules WHERE tag_id = ? AND container_name = ?`, tagID, containerName)
 	return scanSchedule(row)
 }
@@ -215,7 +226,7 @@ func scanSchedule(row *sql.Row) (*models.Schedule, error) {
 	var tagID sql.NullString
 	err := row.Scan(&sched.ID, &sched.ContainerName, &sched.DisplayName, &sched.StackName,
 		&sched.StartCron, &sched.StopCron, &sched.Enabled, &sched.OnDemandEnabled,
-		&sched.OnDemandURL, &sched.IdleTimeoutSec, &tagID, &sched.CreatedAt, &sched.UpdatedAt)
+		&sched.OnDemandURL, &sched.IdleTimeoutSec, &sched.StartupDelaySec, &tagID, &sched.CreatedAt, &sched.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +241,7 @@ func scanScheduleFromRows(rows *sql.Rows) (*models.Schedule, error) {
 	var tagID sql.NullString
 	err := rows.Scan(&sched.ID, &sched.ContainerName, &sched.DisplayName, &sched.StackName,
 		&sched.StartCron, &sched.StopCron, &sched.Enabled, &sched.OnDemandEnabled,
-		&sched.OnDemandURL, &sched.IdleTimeoutSec, &tagID, &sched.CreatedAt, &sched.UpdatedAt)
+		&sched.OnDemandURL, &sched.IdleTimeoutSec, &sched.StartupDelaySec, &tagID, &sched.CreatedAt, &sched.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

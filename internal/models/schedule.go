@@ -10,9 +10,10 @@ type Schedule struct {
 	StartCron       string    `json:"start_cron"`
 	StopCron        string    `json:"stop_cron"`
 	Enabled         bool      `json:"enabled"`
-	OnDemandEnabled bool      `json:"on_demand_enabled"`
-	OnDemandURL     string    `json:"on_demand_url"`
-	IdleTimeoutSec  int       `json:"idle_timeout_sec"`
+	OnDemandEnabled  bool      `json:"on_demand_enabled"`
+	OnDemandURL      string    `json:"on_demand_url"`
+	IdleTimeoutSec   int       `json:"idle_timeout_sec"`
+	StartupDelaySec  int       `json:"startup_delay_sec"`
 	TagID           *string   `json:"tag_id,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`

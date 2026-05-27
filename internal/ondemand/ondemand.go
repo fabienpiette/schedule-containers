@@ -255,22 +255,35 @@ func (m *OnDemandManager) CheckHealth(ctx context.Context, containerName string)
 		return &HealthResult{Healthy: true, OnDemandURL: schedule.OnDemandURL}, nil
 	}
 
-	if !health.HealthCheckDefined && len(health.Ports) > 0 {
-		port := selectPort(schedule.OnDemandURL, health.Ports)
-		addrs := buildProbeAddrs(health, containerName, port)
-		for _, addr := range addrs {
-			slog.Info("on-demand: TCP probe", "container", containerName, "addr", addr)
-			conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
-			if err == nil {
-				conn.Close()
+	if !health.HealthCheckDefined {
+		if len(health.Ports) > 0 {
+			port := selectPort(schedule.OnDemandURL, health.Ports)
+			addrs := buildProbeAddrs(health, containerName, port)
+			for _, addr := range addrs {
+				slog.Info("on-demand: TCP probe", "container", containerName, "addr", addr)
+				conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
+				if err == nil {
+					conn.Close()
+					slog.Info("on-demand: TCP probe succeeded", "container", containerName, "addr", addr)
+					return &HealthResult{Healthy: true, OnDemandURL: schedule.OnDemandURL}, nil
+				}
+				slog.Info("on-demand: TCP probe failed", "container", containerName, "addr", addr, "error", err)
+			}
+		}
+
+		// TCP probe unavailable or failed; use startup delay if configured
+		if schedule.StartupDelaySec > 0 && health.StartedAt != nil {
+			uptime := time.Since(*health.StartedAt)
+			delay := time.Duration(schedule.StartupDelaySec) * time.Second
+			slog.Info("on-demand: startup delay check", "container", containerName,
+				"uptime", uptime.Round(time.Second), "delay", delay)
+			if uptime >= delay {
 				return &HealthResult{Healthy: true, OnDemandURL: schedule.OnDemandURL}, nil
 			}
-			slog.Info("on-demand: TCP probe failed", "container", containerName, "addr", addr, "error", err)
+			return &HealthResult{Healthy: false, OnDemandURL: schedule.OnDemandURL}, nil
 		}
-		return &HealthResult{Healthy: false, OnDemandURL: schedule.OnDemandURL}, nil
-	}
 
-	if !health.HealthCheckDefined && len(health.Ports) == 0 {
+		// No ports, no startup delay: wait for running state + brief grace period
 		running, err := m.docker.IsRunning(ctx, containerName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check container running state: %w", err)

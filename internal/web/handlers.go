@@ -33,10 +33,11 @@ type ScheduleView struct {
 	StartCron       string
 	StopCron        string
 	Enabled         bool
-	OnDemandEnabled bool
-	OnDemandURL     string
-	IdleTimeoutSec  int
-	TagName         string
+	OnDemandEnabled  bool
+	OnDemandURL      string
+	IdleTimeoutSec   int
+	StartupDelaySec  int
+	TagName          string
 }
 
 type WakeData struct {
@@ -125,6 +126,7 @@ func buildScheduleViews(schedules []models.Schedule, tagCache map[string]string)
 			OnDemandEnabled: sched.OnDemandEnabled,
 			OnDemandURL:     sched.OnDemandURL,
 			IdleTimeoutSec:  sched.IdleTimeoutSec,
+			StartupDelaySec: sched.StartupDelaySec,
 		}
 		if sched.TagID != nil {
 			sv.TagName = tagCache[*sched.TagID]
