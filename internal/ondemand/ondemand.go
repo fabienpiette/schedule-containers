@@ -243,6 +243,14 @@ func (m *OnDemandManager) CheckHealth(ctx context.Context, containerName string)
 		return nil, fmt.Errorf("failed to inspect container: %w", err)
 	}
 
+	slog.Info("on-demand: health check",
+		"container", containerName,
+		"healthcheck_defined", health.HealthCheckDefined,
+		"status", health.Status,
+		"ports", health.Ports,
+		"host_ports", health.HostPorts,
+	)
+
 	if health.HealthCheckDefined && health.Status == "healthy" {
 		return &HealthResult{Healthy: true, OnDemandURL: schedule.OnDemandURL}, nil
 	}
@@ -258,12 +266,13 @@ func (m *OnDemandManager) CheckHealth(ctx context.Context, containerName string)
 			port = selectPort(schedule.OnDemandURL, health.Ports)
 		}
 		addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
+		slog.Info("on-demand: TCP probe", "container", containerName, "addr", addr)
 		conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 		if err == nil {
 			conn.Close()
 			return &HealthResult{Healthy: true, OnDemandURL: schedule.OnDemandURL}, nil
 		}
-		slog.Debug("on-demand: TCP connection failed", "container", containerName, "addr", addr, "error", err)
+		slog.Info("on-demand: TCP probe failed", "container", containerName, "addr", addr, "error", err)
 		return &HealthResult{Healthy: false, OnDemandURL: schedule.OnDemandURL}, nil
 	}
 
