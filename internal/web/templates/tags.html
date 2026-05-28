@@ -35,13 +35,14 @@
 </dialog>
 
 {{if .Tags}}
-<table class="data-table">
+<input type="text" id="tag-search" class="table-search" placeholder="Search tags...">
+<table class="data-table" id="tag-table">
     <thead>
         <tr>
-            <th>Name</th>
-            <th>Start Cron</th>
-            <th>Stop Cron</th>
-            <th>Status</th>
+            <th data-sort="name">Name</th>
+            <th data-sort="start">Start Cron</th>
+            <th data-sort="stop">Stop Cron</th>
+            <th data-sort="status">Status</th>
             <th>Containers</th>
             <th>Actions</th>
         </tr>
@@ -189,5 +190,6 @@ function applyTagToContainers(tagId) {
         showToast(err.message, 'error');
     });
 }
+setupTable('tag-table','tag-search');
 </script>
 {{end}}

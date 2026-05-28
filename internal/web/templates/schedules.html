@@ -192,15 +192,16 @@
 </dialog>
 
 <h2>All Schedules</h2>
-<table class="data-table">
+<input type="text" id="schedule-search" class="table-search" placeholder="Search schedules...">
+<table class="data-table" id="schedule-table">
     <thead>
         <tr>
-            <th>Container</th>
-            <th>Stack</th>
-            <th>Schedule</th>
-            <th>Tag</th>
-            <th>On-Demand</th>
-            <th>Status</th>
+            <th data-sort="container">Container</th>
+            <th data-sort="stack">Stack</th>
+            <th data-sort="schedule">Schedule</th>
+            <th data-sort="tag">Tag</th>
+            <th data-sort="ondemand">On-Demand</th>
+            <th data-sort="status">Status</th>
             <th>Actions</th>
         </tr>
     </thead>
@@ -483,5 +484,6 @@ document.getElementById('stack-form').addEventListener('submit', function(e) {
         }
     }).catch(function(err) { showToast(err.message, 'error'); });
 });
+setupTable('schedule-table','schedule-search');
 </script>
 {{end}}

@@ -89,6 +89,51 @@
         function closeConfirm(){
             document.getElementById('confirm-dialog').style.display='none';
         }
+        function setupTable(tableId,searchInputId){
+            var table=document.getElementById(tableId);
+            var search=document.getElementById(searchInputId);
+            if(!table)return;
+            var currentSort=null;
+            var currentDir='asc';
+            var headers=table.querySelectorAll('th[data-sort]');
+            headers.forEach(function(th){
+                th.addEventListener('click',function(){
+                    var key=th.getAttribute('data-sort');
+                    if(currentSort===key){
+                        currentDir=currentDir==='asc'?'desc':'asc';
+                    }else{
+                        currentSort=key;
+                        currentDir='asc';
+                    }
+                    headers.forEach(function(h){h.classList.remove('sort-asc','sort-desc');});
+                    th.classList.add(currentDir==='asc'?'sort-asc':'sort-desc');
+                    var tbody=table.querySelector('tbody');
+                    if(!tbody)return;
+                    var rows=Array.from(tbody.querySelectorAll('tr'));
+                    var colIndex=Array.from(th.parentNode.children).indexOf(th);
+                    rows.sort(function(a,b){
+                        var aText=a.children[colIndex]?a.children[colIndex].textContent.trim().toLowerCase():'';
+                        var bText=b.children[colIndex]?b.children[colIndex].textContent.trim().toLowerCase():'';
+                        if(aText<bText)return currentDir==='asc'?-1:1;
+                        if(aText>bText)return currentDir==='asc'?1:-1;
+                        return 0;
+                    });
+                    rows.forEach(function(r){tbody.appendChild(r);});
+                });
+            });
+            if(search){
+                search.addEventListener('input',function(){
+                    var term=this.value.toLowerCase();
+                    var tbody=table.querySelector('tbody');
+                    if(!tbody)return;
+                    var rows=tbody.querySelectorAll('tr');
+                    rows.forEach(function(row){
+                        var text=row.textContent.toLowerCase();
+                        row.style.display=text.indexOf(term)!==-1?'':'none';
+                    });
+                });
+            }
+        }
         document.body.addEventListener('htmx:afterRequest',function(evt){
             if(evt.detail&&evt.detail.xhr){
                 var msg=evt.detail.xhr.getResponseHeader('X-Toast-Message');

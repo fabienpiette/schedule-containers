@@ -695,3 +695,32 @@ small { color: var(--text-secondary); }
 .mode-fields.active {
     display: block;
 }
+
+.data-table th[data-sort] {
+    cursor: pointer;
+    user-select: none;
+}
+.data-table th[data-sort]:hover {
+    color: var(--text-primary);
+}
+.data-table th.sort-asc::after { content: " ▲"; font-size: 0.65rem; }
+.data-table th.sort-desc::after { content: " ▼"; font-size: 0.65rem; }
+
+.table-search {
+    width: 100%;
+    max-width: 300px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+.table-search:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+}
+.table-search::placeholder {
+    color: var(--text-secondary);
+}

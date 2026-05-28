@@ -3,14 +3,15 @@
 {{define "content"}}
 <h1>Containers</h1>
 
-<table class="data-table">
+<input type="text" id="container-search" class="table-search" placeholder="Search containers...">
+<table class="data-table" id="container-table">
     <thead>
         <tr>
-            <th>Name</th>
-            <th>Image</th>
-            <th>State</th>
-            <th>Stack</th>
-            <th>Tag</th>
+            <th data-sort="name">Name</th>
+            <th data-sort="image">Image</th>
+            <th data-sort="state">State</th>
+            <th data-sort="stack">Stack</th>
+            <th data-sort="tag">Tag</th>
             <th>Actions</th>
         </tr>
     </thead>
@@ -71,5 +72,6 @@ function assignTag(event, containerName) {
         if (row) row.outerHTML = html;
     }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
 }
+setupTable('container-table','container-search');
 </script>
 {{end}}

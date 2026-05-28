@@ -8,15 +8,16 @@
 <a href="/schedules?mode=stack" class="btn-primary">Add Stack Schedule</a>
 
 {{if .Stacks}}
-<table class="data-table">
+<input type="text" id="stack-search" class="table-search" placeholder="Search stacks...">
+<table class="data-table" id="stack-table">
   <thead>
     <tr>
-      <th>Project Name</th>
-      <th>Display Name</th>
-      <th>Start Cron</th>
-      <th>Stop Cron</th>
-      <th>On-Demand</th>
-      <th>Status</th>
+      <th data-sort="name">Project Name</th>
+      <th data-sort="display">Display Name</th>
+      <th data-sort="start">Start Cron</th>
+      <th data-sort="stop">Stop Cron</th>
+      <th data-sort="ondemand">On-Demand</th>
+      <th data-sort="status">Status</th>
       <th>Containers</th>
       <th>Actions</th>
     </tr>
@@ -48,4 +49,8 @@
 {{end}}
 {{end}}
 
-{{define "scripts"}}{{end}}
+{{define "scripts"}}
+<script>
+setupTable('stack-table','stack-search');
+</script>
+{{end}}

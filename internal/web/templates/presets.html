@@ -29,13 +29,14 @@
 </dialog>
 
 {{if .Presets}}
-<table class="data-table">
+<input type="text" id="preset-search" class="table-search" placeholder="Search presets...">
+<table class="data-table" id="preset-table">
     <thead>
         <tr>
-            <th>Label</th>
-            <th>Expression</th>
-            <th>Category</th>
-            <th>Description</th>
+            <th data-sort="label">Label</th>
+            <th data-sort="expression">Expression</th>
+            <th data-sort="category">Category</th>
+            <th data-sort="description">Description</th>
             <th>Actions</th>
         </tr>
     </thead>
@@ -88,5 +89,6 @@ document.getElementById('preset-form').addEventListener('submit', function(e) {
         showToast(err.message, 'error');
     });
 });
+setupTable('preset-table','preset-search');
 </script>
 {{end}}
