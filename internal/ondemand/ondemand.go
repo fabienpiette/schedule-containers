@@ -234,15 +234,7 @@ func (m *OnDemandManager) WakeContainer(ctx context.Context, containerName strin
 	return &WakeResult{Running: false, OnDemandURL: schedule.OnDemandURL}, nil
 }
 
-func (m *OnDemandManager) CheckHealth(ctx context.Context, containerName string) (*HealthResult, error) {
-	m.mu.Lock()
-	schedule, ok := m.schedules[containerName]
-	m.mu.Unlock()
-
-	if !ok {
-		return nil, ErrScheduleNotFound
-	}
-
+func (m *OnDemandManager) checkHealthFor(ctx context.Context, containerName string, schedule *models.Schedule) (*HealthResult, error) {
 	health, err := m.docker.InspectContainer(ctx, containerName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inspect container: %w", err)
@@ -313,6 +305,18 @@ func (m *OnDemandManager) CheckHealth(ctx context.Context, containerName string)
 	}
 
 	return &HealthResult{Healthy: false, OnDemandURL: schedule.OnDemandURL}, nil
+}
+
+func (m *OnDemandManager) CheckHealth(ctx context.Context, containerName string) (*HealthResult, error) {
+	m.mu.Lock()
+	schedule, ok := m.schedules[containerName]
+	m.mu.Unlock()
+
+	if !ok {
+		return nil, ErrScheduleNotFound
+	}
+
+	return m.checkHealthFor(ctx, containerName, schedule)
 }
 
 func (m *OnDemandManager) getOrCreateWakeLock(containerName string) *sync.Mutex {
@@ -487,7 +491,6 @@ func (m *OnDemandManager) CheckStackHealth(ctx context.Context, stackName string
 		return nil, ErrStackNotFound
 	}
 
-	// Delegate to existing health check logic using the primary container.
 	primarySched := &models.Schedule{
 		ContainerName:   stack.PrimaryContainer,
 		OnDemandURL:     stack.OnDemandURL,
@@ -495,17 +498,7 @@ func (m *OnDemandManager) CheckStackHealth(ctx context.Context, stackName string
 		IdleTimeoutSec:  stack.IdleTimeoutSec,
 	}
 
-	m.mu.Lock()
-	m.schedules[stack.PrimaryContainer] = primarySched
-	m.mu.Unlock()
-
-	result, err := m.CheckHealth(ctx, stack.PrimaryContainer)
-
-	m.mu.Lock()
-	delete(m.schedules, stack.PrimaryContainer)
-	m.mu.Unlock()
-
-	return result, err
+	return m.checkHealthFor(ctx, stack.PrimaryContainer, primarySched)
 }
 
 // buildProbeAddrs returns TCP addresses to try in order:
