@@ -29,6 +29,10 @@ func (m *mockDockerClient) StopContainer(ctx context.Context, name string) error
 	return nil
 }
 
+func (m *mockDockerClient) ListContainers(_ context.Context) ([]models.Container, error) {
+	return nil, nil
+}
+
 func (m *mockDockerClient) getStarted() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()

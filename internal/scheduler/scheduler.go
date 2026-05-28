@@ -14,6 +14,7 @@ import (
 type DockerActionClient interface {
 	StartContainer(ctx context.Context, name string) error
 	StopContainer(ctx context.Context, name string) error
+	ListContainers(ctx context.Context) ([]models.Container, error)
 }
 
 type Scheduler struct {
@@ -164,4 +165,111 @@ func ValidateCronExpression(expr string) error {
 		return fmt.Errorf("invalid cron expression: %w", err)
 	}
 	return nil
+}
+
+func (s *Scheduler) AddStack(stack *models.Stack) error {
+	if !stack.Enabled {
+		slog.Info("stack disabled, not registering cron jobs", "stack_id", stack.ID, "stack", stack.Name)
+		return nil
+	}
+	if stack.StartCron == "" && stack.StopCron == "" {
+		slog.Info("stack has no cron expressions, not registering", "stack_id", stack.ID, "stack", stack.Name)
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var entryIDs []cron.EntryID
+
+	if stack.StartCron != "" {
+		if err := ValidateCronExpression(stack.StartCron); err != nil {
+			return fmt.Errorf("invalid start cron: %w", err)
+		}
+		id, err := s.cron.AddFunc(stack.StartCron, func() {
+			s.fireStack(stack, true)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to add start cron for stack: %w", err)
+		}
+		entryIDs = append(entryIDs, id)
+	}
+
+	if stack.StopCron != "" {
+		if err := ValidateCronExpression(stack.StopCron); err != nil {
+			for _, id := range entryIDs {
+				s.cron.Remove(id)
+			}
+			return fmt.Errorf("invalid stop cron: %w", err)
+		}
+		id, err := s.cron.AddFunc(stack.StopCron, func() {
+			s.fireStack(stack, false)
+		})
+		if err != nil {
+			for _, id := range entryIDs {
+				s.cron.Remove(id)
+			}
+			return fmt.Errorf("failed to add stop cron for stack: %w", err)
+		}
+		entryIDs = append(entryIDs, id)
+	}
+
+	s.jobs[stack.ID] = entryIDs
+	slog.Info("registered stack cron jobs", "stack_id", stack.ID, "stack", stack.Name,
+		"start_cron", stack.StartCron, "stop_cron", stack.StopCron)
+	return nil
+}
+
+func (s *Scheduler) RemoveStack(stackID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ids, ok := s.jobs[stackID]
+	if !ok {
+		return
+	}
+	for _, id := range ids {
+		s.cron.Remove(id)
+	}
+	delete(s.jobs, stackID)
+	slog.Info("removed stack cron jobs", "stack_id", stackID)
+}
+
+func (s *Scheduler) UpdateStack(stack *models.Stack) error {
+	s.RemoveStack(stack.ID)
+	return s.AddStack(stack)
+}
+
+func (s *Scheduler) fireStack(stack *models.Stack, start bool) {
+	containers, err := s.docker.ListContainers(context.Background())
+	if err != nil {
+		slog.Error("stack cron: failed to list containers", "stack", stack.Name, "error", err)
+		return
+	}
+
+	action := "start"
+	if !start {
+		action = "stop"
+	}
+
+	for _, c := range containers {
+		if c.StackName != stack.Name {
+			continue
+		}
+		lock := s.getOrCreateLock(c.Name)
+		lock.Lock()
+		var fireErr error
+		if start {
+			slog.Info("stack cron fired: starting container", "stack", stack.Name, "container", c.Name)
+			fireErr = s.docker.StartContainer(context.Background(), c.Name)
+		} else {
+			slog.Info("stack cron fired: stopping container", "stack", stack.Name, "container", c.Name)
+			fireErr = s.docker.StopContainer(context.Background(), c.Name)
+		}
+		lock.Unlock()
+		if fireErr != nil {
+			slog.Error("stack cron: failed to "+action+" container", "stack", stack.Name, "container", c.Name, "error", fireErr)
+		} else {
+			slog.Info("stack cron: "+action+"ed container", "stack", stack.Name, "container", c.Name)
+		}
+	}
 }
