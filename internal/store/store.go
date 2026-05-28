@@ -101,6 +101,31 @@ func (s *Store) migrate() error {
 		}
 	}
 
+	if version < 4 {
+		_, err = s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS stacks (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL UNIQUE,
+				display_name TEXT NOT NULL DEFAULT '',
+				start_cron TEXT NOT NULL DEFAULT '',
+				stop_cron TEXT NOT NULL DEFAULT '',
+				enabled BOOLEAN NOT NULL DEFAULT TRUE,
+				on_demand_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+				on_demand_url TEXT NOT NULL DEFAULT '',
+				primary_container TEXT NOT NULL DEFAULT '',
+				idle_timeout_sec INTEGER NOT NULL DEFAULT 0,
+				startup_delay_sec INTEGER NOT NULL DEFAULT 0,
+				created_at TIMESTAMP NOT NULL,
+				updated_at TIMESTAMP NOT NULL
+			);
+			UPDATE schema_version SET version = 4;
+			INSERT OR IGNORE INTO schema_version (version) VALUES (4);
+		`)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -339,4 +364,99 @@ func scanTag(row *sql.Row) (*models.Tag, error) {
 		return nil, err
 	}
 	return &tag, nil
+}
+
+// --- Stack CRUD ---
+
+func (s *Store) CreateStack(ctx context.Context, stack *models.Stack) (*models.Stack, error) {
+	now := time.Now().UTC()
+	stack.ID = uuid.New().String()
+	stack.CreatedAt = now
+	stack.UpdatedAt = now
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO stacks (id, name, display_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, primary_container, idle_timeout_sec, startup_delay_sec, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		stack.ID, stack.Name, stack.DisplayName, stack.StartCron, stack.StopCron,
+		stack.Enabled, stack.OnDemandEnabled, stack.OnDemandURL, stack.PrimaryContainer,
+		stack.IdleTimeoutSec, stack.StartupDelaySec, stack.CreatedAt, stack.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return stack, nil
+}
+
+func (s *Store) GetStack(ctx context.Context, id string) (*models.Stack, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, name, display_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, primary_container, idle_timeout_sec, startup_delay_sec, created_at, updated_at
+		FROM stacks WHERE id = ?`, id)
+	return scanStack(row)
+}
+
+func (s *Store) GetStackByName(ctx context.Context, name string) (*models.Stack, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, name, display_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, primary_container, idle_timeout_sec, startup_delay_sec, created_at, updated_at
+		FROM stacks WHERE name = ?`, name)
+	return scanStack(row)
+}
+
+func (s *Store) ListStacks(ctx context.Context) ([]models.Stack, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, name, display_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, primary_container, idle_timeout_sec, startup_delay_sec, created_at, updated_at
+		FROM stacks ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var stacks []models.Stack
+	for rows.Next() {
+		var st models.Stack
+		if err := rows.Scan(&st.ID, &st.Name, &st.DisplayName, &st.StartCron, &st.StopCron,
+			&st.Enabled, &st.OnDemandEnabled, &st.OnDemandURL, &st.PrimaryContainer,
+			&st.IdleTimeoutSec, &st.StartupDelaySec, &st.CreatedAt, &st.UpdatedAt); err != nil {
+			return nil, err
+		}
+		stacks = append(stacks, st)
+	}
+	return stacks, rows.Err()
+}
+
+func (s *Store) UpdateStack(ctx context.Context, stack *models.Stack) (*models.Stack, error) {
+	stack.UpdatedAt = time.Now().UTC()
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE stacks SET name=?, display_name=?, start_cron=?, stop_cron=?, enabled=?, on_demand_enabled=?, on_demand_url=?, primary_container=?, idle_timeout_sec=?, startup_delay_sec=?, updated_at=?
+		WHERE id=?`,
+		stack.Name, stack.DisplayName, stack.StartCron, stack.StopCron,
+		stack.Enabled, stack.OnDemandEnabled, stack.OnDemandURL, stack.PrimaryContainer,
+		stack.IdleTimeoutSec, stack.StartupDelaySec, stack.UpdatedAt, stack.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return stack, nil
+}
+
+func (s *Store) DeleteStack(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM stacks WHERE id = ?", id)
+	return err
+}
+
+func (s *Store) ToggleStack(ctx context.Context, id string) (*models.Stack, error) {
+	stack, err := s.GetStack(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	stack.Enabled = !stack.Enabled
+	return s.UpdateStack(ctx, stack)
+}
+
+func scanStack(row *sql.Row) (*models.Stack, error) {
+	var st models.Stack
+	err := row.Scan(&st.ID, &st.Name, &st.DisplayName, &st.StartCron, &st.StopCron,
+		&st.Enabled, &st.OnDemandEnabled, &st.OnDemandURL, &st.PrimaryContainer,
+		&st.IdleTimeoutSec, &st.StartupDelaySec, &st.CreatedAt, &st.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &st, nil
 }

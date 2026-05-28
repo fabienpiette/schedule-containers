@@ -480,3 +480,120 @@ func TestUniqueTagContainerAllowsNull(t *testing.T) {
 		t.Errorf("expected 2 schedules with null tag_id and same container, got %d", len(schedules))
 	}
 }
+
+// --- Stack tests ---
+
+func TestCreateAndGetStack(t *testing.T) {
+	s := tempDB(t)
+	stack := &models.Stack{
+		Name:             "myproject",
+		DisplayName:      "My Project",
+		StartCron:        "0 8 * * 1-5",
+		StopCron:         "0 18 * * 1-5",
+		Enabled:          true,
+		OnDemandEnabled:  false,
+		PrimaryContainer: "",
+	}
+	created, err := s.CreateStack(context.Background(), stack)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if created.ID == "" {
+		t.Error("expected non-empty ID")
+	}
+	if created.CreatedAt.IsZero() {
+		t.Error("expected non-zero CreatedAt")
+	}
+
+	got, err := s.GetStack(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Name != "myproject" {
+		t.Errorf("expected myproject, got %s", got.Name)
+	}
+}
+
+func TestGetStackByName(t *testing.T) {
+	s := tempDB(t)
+	stack := &models.Stack{Name: "proj", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
+	created, _ := s.CreateStack(context.Background(), stack)
+
+	got, err := s.GetStackByName(context.Background(), "proj")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.ID != created.ID {
+		t.Errorf("expected ID %s, got %s", created.ID, got.ID)
+	}
+}
+
+func TestListStacks(t *testing.T) {
+	s := tempDB(t)
+	s.CreateStack(context.Background(), &models.Stack{Name: "a", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	s.CreateStack(context.Background(), &models.Stack{Name: "b", StartCron: "0 9 * * *", StopCron: "0 19 * * *", Enabled: true})
+
+	stacks, err := s.ListStacks(context.Background())
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(stacks) != 2 {
+		t.Errorf("expected 2, got %d", len(stacks))
+	}
+}
+
+func TestUpdateStack(t *testing.T) {
+	s := tempDB(t)
+	stack := &models.Stack{Name: "proj", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
+	created, _ := s.CreateStack(context.Background(), stack)
+
+	created.DisplayName = "Updated"
+	created.Enabled = false
+	updated, err := s.UpdateStack(context.Background(), created)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if updated.DisplayName != "Updated" {
+		t.Errorf("expected Updated, got %s", updated.DisplayName)
+	}
+	if updated.Enabled {
+		t.Error("expected Enabled=false")
+	}
+}
+
+func TestDeleteStack(t *testing.T) {
+	s := tempDB(t)
+	stack := &models.Stack{Name: "proj", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
+	created, _ := s.CreateStack(context.Background(), stack)
+
+	if err := s.DeleteStack(context.Background(), created.ID); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	_, err := s.GetStack(context.Background(), created.ID)
+	if err == nil {
+		t.Error("expected error after delete")
+	}
+}
+
+func TestToggleStack(t *testing.T) {
+	s := tempDB(t)
+	stack := &models.Stack{Name: "proj", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true}
+	created, _ := s.CreateStack(context.Background(), stack)
+
+	toggled, err := s.ToggleStack(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if toggled.Enabled {
+		t.Error("expected Enabled=false after toggle")
+	}
+}
+
+func TestStackNameUnique(t *testing.T) {
+	s := tempDB(t)
+	s.CreateStack(context.Background(), &models.Stack{Name: "proj", StartCron: "0 8 * * *", StopCron: "0 18 * * *", Enabled: true})
+	_, err := s.CreateStack(context.Background(), &models.Stack{Name: "proj", StartCron: "0 9 * * *", StopCron: "0 19 * * *", Enabled: true})
+	if err == nil {
+		t.Error("expected unique constraint error")
+	}
+}
