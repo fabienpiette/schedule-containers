@@ -45,7 +45,7 @@ func setupTestServer(t *testing.T) (*Server, *mockSchedulerService) {
 	cfg := &config.Config{WebHost: "127.0.0.1", WebPort: 0}
 
 	dockerClient, _ := docker.NewClient("unix:///var/run/docker.sock")
-	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, nil)
+	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, nil, nil)
 	return srv, mockSched
 }
 
@@ -69,6 +69,16 @@ func (m *mockSchedulerService) RemoveSchedule(scheduleID string) error {
 
 func (m *mockSchedulerService) ScheduleCount() int {
 	return len(m.schedules)
+}
+
+func (m *mockSchedulerService) AddStack(stack *models.Stack) error {
+	return nil
+}
+
+func (m *mockSchedulerService) RemoveStack(stackID string) {}
+
+func (m *mockSchedulerService) UpdateStack(stack *models.Stack) error {
+	return nil
 }
 
 func TestAPIListSchedules(t *testing.T) {

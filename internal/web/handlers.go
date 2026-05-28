@@ -26,13 +26,14 @@ type DashboardData struct {
 }
 
 type ScheduleView struct {
-	ID              string
-	ContainerName   string
-	DisplayName     string
-	StackName       string
-	StartCron       string
-	StopCron        string
-	Enabled         bool
+	ID               string
+	ContainerName    string
+	DisplayName      string
+	StackName        string
+	StackScheduleName string
+	StartCron        string
+	StopCron         string
+	Enabled          bool
 	OnDemandEnabled  bool
 	OnDemandURL      string
 	IdleTimeoutSec   int
@@ -47,14 +48,15 @@ type WakeData struct {
 }
 
 type ContainerView struct {
-	ID        string
-	Name      string
-	Image     string
-	State     string
-	Status    string
-	StackName string
-	TagName   string
-	TagID     string
+	ID             string
+	Name           string
+	Image          string
+	State          string
+	Status         string
+	StackName      string
+	StackScheduled bool
+	TagName        string
+	TagID          string
 }
 
 type PresetView struct {
@@ -97,6 +99,17 @@ type PresetsData struct {
 	Presets []PresetView
 }
 
+type StackView struct {
+	models.Stack
+	ContainerCount int
+}
+
+type StacksData struct {
+	Title      string
+	Stacks     []StackView
+	Containers []string
+}
+
 type TagsData struct {
 	Title           string
 	Tags            []TagView
@@ -112,31 +125,60 @@ func buildTagCache(tags []models.Tag) map[string]string {
 	return cache
 }
 
-func buildScheduleViews(schedules []models.Schedule, tagCache map[string]string) []ScheduleView {
+func buildStackNameSet(stacks []models.Stack) map[string]bool {
+	set := make(map[string]bool, len(stacks))
+	for _, st := range stacks {
+		if st.Enabled {
+			set[st.Name] = true
+		}
+	}
+	return set
+}
+
+func (s *Server) isStackScheduled(ctx context.Context, stackName string) bool {
+	if stackName == "" {
+		return false
+	}
+	stacks, err := s.store.ListStacks(ctx)
+	if err != nil {
+		return false
+	}
+	for _, st := range stacks {
+		if st.Name == stackName && st.Enabled {
+			return true
+		}
+	}
+	return false
+}
+
+func buildScheduleViews(schedules []models.Schedule, tagCache map[string]string, stackNameSet map[string]bool) []ScheduleView {
 	views := make([]ScheduleView, len(schedules))
 	for i, sched := range schedules {
 		sv := ScheduleView{
-			ID:              sched.ID,
-			ContainerName:   sched.ContainerName,
-			DisplayName:     sched.DisplayName,
-			StackName:       sched.StackName,
-			StartCron:       sched.StartCron,
-			StopCron:        sched.StopCron,
-			Enabled:         sched.Enabled,
-			OnDemandEnabled: sched.OnDemandEnabled,
-			OnDemandURL:     sched.OnDemandURL,
-			IdleTimeoutSec:  sched.IdleTimeoutSec,
-			StartupDelaySec: sched.StartupDelaySec,
+			ID:               sched.ID,
+			ContainerName:    sched.ContainerName,
+			DisplayName:      sched.DisplayName,
+			StackName:        sched.StackName,
+			StartCron:        sched.StartCron,
+			StopCron:         sched.StopCron,
+			Enabled:          sched.Enabled,
+			OnDemandEnabled:  sched.OnDemandEnabled,
+			OnDemandURL:      sched.OnDemandURL,
+			IdleTimeoutSec:   sched.IdleTimeoutSec,
+			StartupDelaySec:  sched.StartupDelaySec,
 		}
 		if sched.TagID != nil {
 			sv.TagName = tagCache[*sched.TagID]
+		}
+		if sched.StackName != "" && stackNameSet[sched.StackName] {
+			sv.StackScheduleName = sched.StackName
 		}
 		views[i] = sv
 	}
 	return views
 }
 
-func buildContainerViews(containers []models.Container, schedules []models.Schedule, tagCache map[string]string) []ContainerView {
+func buildContainerViews(containers []models.Container, schedules []models.Schedule, tagCache map[string]string, stackNameSet map[string]bool) []ContainerView {
 	schedByContainer := make(map[string]string)
 	tagIDByContainer := make(map[string]string)
 	for _, sched := range schedules {
@@ -148,14 +190,15 @@ func buildContainerViews(containers []models.Container, schedules []models.Sched
 	views := make([]ContainerView, len(containers))
 	for i, c := range containers {
 		views[i] = ContainerView{
-			ID:        c.ID,
-			Name:      c.Name,
-			Image:     c.Image,
-			State:     c.State,
-			Status:    c.Status,
-			StackName: c.StackName,
-			TagName:   schedByContainer[c.Name],
-			TagID:     tagIDByContainer[c.Name],
+			ID:             c.ID,
+			Name:           c.Name,
+			Image:          c.Image,
+			State:          c.State,
+			Status:         c.Status,
+			StackName:      c.StackName,
+			StackScheduled: stackNameSet[c.StackName],
+			TagName:        schedByContainer[c.Name],
+			TagID:          tagIDByContainer[c.Name],
 		}
 	}
 	return views
@@ -164,7 +207,9 @@ func buildContainerViews(containers []models.Container, schedules []models.Sched
 func (s *Server) buildSingleContainerView(ctx context.Context, ctr *models.Container) ContainerView {
 	schedules, _ := s.store.ListSchedules(ctx)
 	tags, _ := s.store.ListTags(ctx)
+	stacks, _ := s.store.ListStacks(ctx)
 	tagCache := buildTagCache(tags)
+	stackNameSet := buildStackNameSet(stacks)
 	tagName, tagID := "", ""
 	for _, sched := range schedules {
 		if sched.ContainerName == ctr.Name && sched.TagID != nil {
@@ -174,14 +219,15 @@ func (s *Server) buildSingleContainerView(ctx context.Context, ctr *models.Conta
 		}
 	}
 	return ContainerView{
-		ID:        ctr.ID,
-		Name:      ctr.Name,
-		Image:     ctr.Image,
-		State:     ctr.State,
-		Status:    ctr.Status,
-		StackName: ctr.StackName,
-		TagName:   tagName,
-		TagID:     tagID,
+		ID:             ctr.ID,
+		Name:           ctr.Name,
+		Image:          ctr.Image,
+		State:          ctr.State,
+		Status:         ctr.Status,
+		StackName:      ctr.StackName,
+		StackScheduled: stackNameSet[ctr.StackName],
+		TagName:        tagName,
+		TagID:          tagID,
 	}
 }
 
@@ -189,8 +235,10 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	schedules, _ := s.store.ListSchedules(r.Context())
 	containers, _ := s.docker.ListContainers(r.Context())
 	tags, _ := s.store.ListTags(r.Context())
+	stacks, _ := s.store.ListStacks(r.Context())
 
 	tagCache := buildTagCache(tags)
+	stackNameSet := buildStackNameSet(stacks)
 	tagViews := make([]TagView, len(tags))
 	for i, tag := range tags {
 		tagViews[i] = TagView{
@@ -202,7 +250,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	allContainers := buildContainerViews(containers, schedules, tagCache)
+	allContainers := buildContainerViews(containers, schedules, tagCache, stackNameSet)
 	scheduledNames := make(map[string]bool, len(schedules))
 	for _, sched := range schedules {
 		scheduledNames[sched.ContainerName] = true
@@ -225,7 +273,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 	s.renderPage(w, "dashboard.html", DashboardData{
 		Title:          "Dashboard",
-		Schedules:      buildScheduleViews(schedules, tagCache),
+		Schedules:      buildScheduleViews(schedules, tagCache, stackNameSet),
 		Containers:     scheduled,
 		Tags:           tagViews,
 		RunningCount:   runningCount,
@@ -239,8 +287,10 @@ func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 	containers, _ := s.docker.ListContainers(r.Context())
 	schedules, _ := s.store.ListSchedules(r.Context())
 	tags, _ := s.store.ListTags(r.Context())
+	stacks, _ := s.store.ListStacks(r.Context())
 
 	tagCache := buildTagCache(tags)
+	stackNameSet := buildStackNameSet(stacks)
 	tagOptions := make([]TagOption, len(tags))
 	for i, t := range tags {
 		tagOptions[i] = TagOption{ID: t.ID, Name: t.Name}
@@ -248,7 +298,7 @@ func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 
 	s.renderPage(w, "containers.html", ContainersData{
 		Title:      "Containers",
-		Containers: buildContainerViews(containers, schedules, tagCache),
+		Containers: buildContainerViews(containers, schedules, tagCache, stackNameSet),
 		Tags:       tagOptions,
 	})
 }
@@ -257,8 +307,10 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 	containers, _ := s.docker.ListContainers(r.Context())
 	schedules, _ := s.store.ListSchedules(r.Context())
 	tags, _ := s.store.ListTags(r.Context())
+	stacks, _ := s.store.ListStacks(r.Context())
 
 	tagCache := buildTagCache(tags)
+	stackNameSet := buildStackNameSet(stacks)
 	containerViews := make([]ContainerView, len(containers))
 	for i, c := range containers {
 		containerViews[i] = ContainerView{ID: c.ID, Name: c.Name}
@@ -267,7 +319,7 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, "schedules.html", SchedulesData{
 		Title:      "Schedules",
 		Containers: containerViews,
-		Schedules:  buildScheduleViews(schedules, tagCache),
+		Schedules:  buildScheduleViews(schedules, tagCache, stackNameSet),
 	})
 }
 
@@ -362,6 +414,95 @@ func (s *Server) handleWakeStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Error("health check failed", "container", containerName, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if r.Header.Get("HX-Request") == "true" || wantsHTML(r) {
+		if result.Healthy {
+			w.Header().Set("HX-Redirect", result.OnDemandURL)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, `<span class="log-line">service not ready yet — polling</span>`)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"healthy": result.Healthy,
+		"url":     result.OnDemandURL,
+	})
+}
+
+func (s *Server) handleStacks(w http.ResponseWriter, r *http.Request) {
+	stacks, _ := s.store.ListStacks(r.Context())
+	containers, _ := s.docker.ListContainers(r.Context())
+
+	containerNames := make([]string, len(containers))
+	for i, c := range containers {
+		containerNames[i] = c.Name
+	}
+
+	countByStack := make(map[string]int)
+	for _, c := range containers {
+		if c.StackName != "" {
+			countByStack[c.StackName]++
+		}
+	}
+
+	views := make([]StackView, len(stacks))
+	for i, st := range stacks {
+		views[i] = StackView{
+			Stack:          st,
+			ContainerCount: countByStack[st.Name],
+		}
+	}
+
+	s.renderPage(w, "stacks.html", StacksData{
+		Title:      "Stacks",
+		Stacks:     views,
+		Containers: containerNames,
+	})
+}
+
+func (s *Server) handleWakeStack(w http.ResponseWriter, r *http.Request) {
+	stackName := chi.URLParam(r, "name")
+
+	result, err := s.stackOndemand.WakeStack(r.Context(), stackName)
+	if err != nil {
+		if errors.Is(err, ondemand.ErrStackNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		slog.Error("wake stack failed", "stack", stackName, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if result.Running {
+		http.Redirect(w, r, result.OnDemandURL, http.StatusFound)
+		return
+	}
+
+	s.renderStandalone(w, "wake.html", WakeData{
+		Title:         "Waking " + stackName,
+		ContainerName: stackName,
+		OnDemandURL:   result.OnDemandURL,
+	})
+}
+
+func (s *Server) handleWakeStackStatus(w http.ResponseWriter, r *http.Request) {
+	stackName := chi.URLParam(r, "name")
+
+	result, err := s.stackOndemand.CheckStackHealth(r.Context(), stackName)
+	if err != nil {
+		if errors.Is(err, ondemand.ErrStackNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		slog.Error("stack health check failed", "stack", stackName, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

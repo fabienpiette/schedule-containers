@@ -26,6 +26,9 @@ type SchedulerService interface {
 	AddSchedule(schedule *models.Schedule) error
 	RemoveSchedule(scheduleID string) error
 	ScheduleCount() int
+	AddStack(stack *models.Stack) error
+	RemoveStack(stackID string)
+	UpdateStack(stack *models.Stack) error
 }
 
 type OnDemandService interface {
@@ -35,6 +38,13 @@ type OnDemandService interface {
 	Unwatch(containerName string)
 }
 
+type StackOnDemandService interface {
+	AddStack(stack *models.Stack)
+	RemoveStack(stackID string)
+	WakeStack(ctx context.Context, stackName string) (*ondemand.WakeResult, error)
+	CheckStackHealth(ctx context.Context, stackName string) (*ondemand.HealthResult, error)
+}
+
 type Server struct {
 	httpServer    *http.Server
 	store         *store.Store
@@ -42,6 +52,7 @@ type Server struct {
 	scheduler     SchedulerService
 	presetService *cronpresets.Service
 	ondemand      OnDemandService
+	stackOndemand StackOnDemandService
 	templates     map[string]*template.Template
 }
 
@@ -49,11 +60,12 @@ type Server struct {
 var embeddedFS embed.FS
 
 var (
-	_ SchedulerService = (*scheduler.Scheduler)(nil)
-	_ OnDemandService  = (*ondemand.OnDemandManager)(nil)
+	_ SchedulerService    = (*scheduler.Scheduler)(nil)
+	_ OnDemandService     = (*ondemand.OnDemandManager)(nil)
+	_ StackOnDemandService = (*ondemand.OnDemandManager)(nil)
 )
 
-func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service, odm OnDemandService) *Server {
+func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service, odm OnDemandService, sodm StackOnDemandService) *Server {
 	baseFiles := []string{
 		"templates/layout.html",
 		"templates/partials.html",
@@ -64,6 +76,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		"schedules.html":  "templates/schedules.html",
 		"presets.html":    "templates/presets.html",
 		"tags.html":       "templates/tags.html",
+		"stacks.html":     "templates/stacks.html",
 	}
 
 	templates := make(map[string]*template.Template)
@@ -81,6 +94,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		scheduler:     sched,
 		presetService: ps,
 		ondemand:      odm,
+		stackOndemand: sodm,
 		templates:     templates,
 	}
 
@@ -95,6 +109,10 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	r.Get("/schedules", srv.handleSchedulesNew)
 	r.Get("/presets", srv.handlePresets)
 	r.Get("/tags", srv.handleTags)
+	r.Get("/stacks", srv.handleStacks)
+	r.Get("/wake/stack/{name}", srv.handleWakeStack)
+	r.Get("/wake/stack/{name}/", srv.handleWakeStack)
+	r.Get("/wake/stack/{name}/status", srv.handleWakeStackStatus)
 	r.Get("/wake/{name}", srv.handleWake)
 	r.Get("/wake/{name}/", srv.handleWake)
 	r.Get("/wake/{name}/status", srv.handleWakeStatus)

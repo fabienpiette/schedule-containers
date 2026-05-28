@@ -259,19 +259,30 @@ func (s *Server) apiToggleSchedule(w http.ResponseWriter, r *http.Request) {
 				tagName = tag.Name
 			}
 		}
+		var stackScheduleName string
+		if toggled.StackName != "" {
+			stacks, _ := s.store.ListStacks(r.Context())
+			for _, st := range stacks {
+				if st.Name == toggled.StackName && st.Enabled {
+					stackScheduleName = st.Name
+					break
+				}
+			}
+		}
 		sv := ScheduleView{
-			ID:              toggled.ID,
-			ContainerName:   toggled.ContainerName,
-			DisplayName:     toggled.DisplayName,
-			StackName:       toggled.StackName,
-			StartCron:       toggled.StartCron,
-			StopCron:        toggled.StopCron,
-			Enabled:         toggled.Enabled,
-			OnDemandEnabled: toggled.OnDemandEnabled,
-			OnDemandURL:     toggled.OnDemandURL,
-			IdleTimeoutSec:  toggled.IdleTimeoutSec,
-			StartupDelaySec: toggled.StartupDelaySec,
-			TagName:         tagName,
+			ID:                toggled.ID,
+			ContainerName:    toggled.ContainerName,
+			DisplayName:       toggled.DisplayName,
+			StackName:         toggled.StackName,
+			StackScheduleName: stackScheduleName,
+			StartCron:        toggled.StartCron,
+			StopCron:         toggled.StopCron,
+			Enabled:           toggled.Enabled,
+			OnDemandEnabled:   toggled.OnDemandEnabled,
+			OnDemandURL:       toggled.OnDemandURL,
+			IdleTimeoutSec:    toggled.IdleTimeoutSec,
+			StartupDelaySec:   toggled.StartupDelaySec,
+			TagName:           tagName,
 		}
 		w.Header().Set("X-Toast-Message", "Schedule%20toggled")
 		s.renderPartial(w, "schedule-row", sv)
@@ -400,7 +411,7 @@ func (s *Server) apiImportSchedules(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	schedules, tags, err := yamlconfig.ToSchedulesAndTags(body)
+	schedules, tags, stacks, err := yamlconfig.ToSchedulesTagsAndStacks(body)
 	if err != nil {
 		http.Error(w, "failed to parse YAML: "+err.Error(), http.StatusBadRequest)
 		return
@@ -433,8 +444,29 @@ func (s *Server) apiImportSchedules(w http.ResponseWriter, r *http.Request) {
 		tagsCreated++
 	}
 
+	stacksCreated := 0
+	for _, st := range stacks {
+		if _, err := s.store.CreateStack(r.Context(), &st); err != nil {
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				slog.Warn("skipping existing stack during import", "name", st.Name)
+				continue
+			}
+			slog.Error("failed to import stack", "name", st.Name, "error", err)
+			continue
+		}
+		if st.Enabled {
+			if err := s.scheduler.AddStack(&st); err != nil {
+				slog.Warn("failed to add imported stack to cron runner", "error", err)
+			}
+		}
+		if st.OnDemandEnabled {
+			s.stackOndemand.AddStack(&st)
+		}
+		stacksCreated++
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]int{"imported": created, "total": len(schedules), "tags_imported": tagsCreated, "tags_total": len(tags)})
+	json.NewEncoder(w).Encode(map[string]int{"imported": created, "total": len(schedules), "tags_imported": tagsCreated, "tags_total": len(tags), "stacks_imported": stacksCreated, "stacks_total": len(stacks)})
 }
 
 func (s *Server) apiExportSchedules(w http.ResponseWriter, r *http.Request) {
@@ -452,7 +484,14 @@ func (s *Server) apiExportSchedules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := yamlconfig.FromSchedulesAndTags(schedules, tags)
+	stacks, err := s.store.ListStacks(r.Context())
+	if err != nil {
+		slog.Error("failed to list stacks", "error", err)
+		http.Error(w, "failed to list stacks", http.StatusInternalServerError)
+		return
+	}
+
+	data := yamlconfig.FromSchedulesTagsAndStacks(schedules, tags, stacks)
 	w.Header().Set("Content-Type", "application/yaml")
 	w.Write(data)
 }
@@ -731,14 +770,15 @@ func (s *Server) apiApplyTagToContainers(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		cv := ContainerView{
-			ID:        ctr.ID,
-			Name:      ctr.Name,
-			Image:     ctr.Image,
-			State:     ctr.State,
-			Status:    ctr.Status,
-			StackName: ctr.StackName,
-			TagName:   tag.Name,
-			TagID:     tag.ID,
+			ID:             ctr.ID,
+			Name:           ctr.Name,
+			Image:          ctr.Image,
+			State:          ctr.State,
+			Status:         ctr.Status,
+			StackName:      ctr.StackName,
+			StackScheduled: s.isStackScheduled(r.Context(), ctr.StackName),
+			TagName:        tag.Name,
+			TagID:          tag.ID,
 		}
 		s.renderPartial(w, "container-row", cv)
 		return
@@ -775,12 +815,13 @@ func (s *Server) apiRemoveTagFromContainer(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		cv := ContainerView{
-			ID:        ctr.ID,
-			Name:      ctr.Name,
-			Image:     ctr.Image,
-			State:     ctr.State,
-			Status:    ctr.Status,
-			StackName: ctr.StackName,
+			ID:             ctr.ID,
+			Name:           ctr.Name,
+			Image:          ctr.Image,
+			State:          ctr.State,
+			Status:         ctr.Status,
+			StackName:      ctr.StackName,
+			StackScheduled: s.isStackScheduled(r.Context(), ctr.StackName),
 		}
 		w.Header().Set("X-Toast-Message", "Tag%20removed%20from%20container")
 		s.renderPartial(w, "container-row", cv)
@@ -823,4 +864,208 @@ func (s *Server) apiWakeURL(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"wake_url": "/wake/" + schedule.ContainerName + "/",
 	})
+}
+
+// --- Stack API handlers ---
+
+func (s *Server) apiListStacks(w http.ResponseWriter, r *http.Request) {
+	stacks, err := s.store.ListStacks(r.Context())
+	if err != nil {
+		slog.Error("failed to list stacks", "error", err)
+		http.Error(w, "failed to list stacks", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stacks)
+}
+
+func (s *Server) apiCreateStack(w http.ResponseWriter, r *http.Request) {
+	var req models.Stack
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	if req.StartCron == "" && req.StopCron == "" && !req.OnDemandEnabled {
+		http.Error(w, "at least one of start_cron, stop_cron, or on_demand_enabled is required", http.StatusBadRequest)
+		return
+	}
+	if req.StartCron != "" {
+		if err := scheduler.ValidateCronExpression(req.StartCron); err != nil {
+			http.Error(w, "invalid start_cron: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if req.StopCron != "" {
+		if err := scheduler.ValidateCronExpression(req.StopCron); err != nil {
+			http.Error(w, "invalid stop_cron: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if req.OnDemandEnabled {
+		if req.OnDemandURL == "" {
+			http.Error(w, "on_demand_url is required when on_demand_enabled", http.StatusBadRequest)
+			return
+		}
+		if req.PrimaryContainer == "" {
+			http.Error(w, "primary_container is required when on_demand_enabled", http.StatusBadRequest)
+			return
+		}
+	}
+
+	created, err := s.store.CreateStack(r.Context(), &req)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			http.Error(w, "stack name already exists", http.StatusConflict)
+			return
+		}
+		slog.Error("failed to create stack", "error", err)
+		http.Error(w, "failed to create stack", http.StatusInternalServerError)
+		return
+	}
+
+	if created.Enabled {
+		if err := s.scheduler.AddStack(created); err != nil {
+			slog.Warn("failed to register stack cron", "stack", created.Name, "error", err)
+		}
+	}
+	if created.OnDemandEnabled {
+		s.stackOndemand.AddStack(created)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(created)
+}
+
+func (s *Server) apiGetStack(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	stack, err := s.store.GetStack(r.Context(), id)
+	if err != nil {
+		http.Error(w, "stack not found", http.StatusNotFound)
+		return
+	}
+
+	containers, _ := s.docker.ListContainers(r.Context())
+	var stackContainers []models.Container
+	for _, c := range containers {
+		if c.StackName == stack.Name {
+			stackContainers = append(stackContainers, c)
+		}
+	}
+
+	type stackDetail struct {
+		models.Stack
+		Containers []models.Container `json:"containers"`
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stackDetail{Stack: *stack, Containers: stackContainers})
+}
+
+func (s *Server) apiUpdateStack(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	existing, err := s.store.GetStack(r.Context(), id)
+	if err != nil {
+		http.Error(w, "stack not found", http.StatusNotFound)
+		return
+	}
+
+	var req models.Stack
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	req.ID = id
+	req.CreatedAt = existing.CreatedAt
+
+	if req.StartCron != "" {
+		if err := scheduler.ValidateCronExpression(req.StartCron); err != nil {
+			http.Error(w, "invalid start_cron: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if req.StopCron != "" {
+		if err := scheduler.ValidateCronExpression(req.StopCron); err != nil {
+			http.Error(w, "invalid stop_cron: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if req.OnDemandEnabled {
+		if req.OnDemandURL == "" {
+			http.Error(w, "on_demand_url is required when on_demand_enabled", http.StatusBadRequest)
+			return
+		}
+		if req.PrimaryContainer == "" {
+			http.Error(w, "primary_container is required when on_demand_enabled", http.StatusBadRequest)
+			return
+		}
+	}
+
+	updated, err := s.store.UpdateStack(r.Context(), &req)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			http.Error(w, "stack name already exists", http.StatusConflict)
+			return
+		}
+		slog.Error("failed to update stack", "error", err)
+		http.Error(w, "failed to update stack", http.StatusInternalServerError)
+		return
+	}
+
+	s.stackOndemand.RemoveStack(id)
+	if err := s.scheduler.UpdateStack(updated); err != nil {
+		slog.Warn("failed to update stack cron", "stack", updated.Name, "error", err)
+	}
+	if updated.OnDemandEnabled && updated.Enabled {
+		s.stackOndemand.AddStack(updated)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updated)
+}
+
+func (s *Server) apiDeleteStack(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if _, err := s.store.GetStack(r.Context(), id); err != nil {
+		http.Error(w, "stack not found", http.StatusNotFound)
+		return
+	}
+
+	s.scheduler.RemoveStack(id)
+	s.stackOndemand.RemoveStack(id)
+
+	if err := s.store.DeleteStack(r.Context(), id); err != nil {
+		slog.Error("failed to delete stack", "error", err)
+		http.Error(w, "failed to delete stack", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) apiToggleStack(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	toggled, err := s.store.ToggleStack(r.Context(), id)
+	if err != nil {
+		http.Error(w, "stack not found", http.StatusNotFound)
+		return
+	}
+
+	s.stackOndemand.RemoveStack(id)
+	if toggled.Enabled {
+		if err := s.scheduler.AddStack(toggled); err != nil {
+			slog.Warn("failed to re-register stack cron on toggle", "stack", toggled.Name, "error", err)
+		}
+		if toggled.OnDemandEnabled {
+			s.stackOndemand.AddStack(toggled)
+		}
+	} else {
+		s.scheduler.RemoveStack(id)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(toggled)
 }
