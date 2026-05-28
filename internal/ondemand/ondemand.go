@@ -24,6 +24,7 @@ type OnDemandDockerClient interface {
 	IsRunning(ctx context.Context, name string) (bool, error)
 	InspectContainer(ctx context.Context, name string) (*docker.ContainerHealth, error)
 	ContainerStats(ctx context.Context, name string) (<-chan docker.StatsSnapshot, error)
+	ListContainers(ctx context.Context) ([]models.Container, error)
 }
 
 type WakeResult struct {
@@ -37,22 +38,26 @@ type HealthResult struct {
 }
 
 type OnDemandManager struct {
-	docker    OnDemandDockerClient
-	store     *store.Store
-	mu        sync.Mutex
-	wakeMu    map[string]*sync.Mutex
-	trackers  map[string]*idleTracker
-	schedules map[string]*models.Schedule
-	cancel    context.CancelFunc
+	docker        OnDemandDockerClient
+	store         *store.Store
+	mu            sync.Mutex
+	wakeMu        map[string]*sync.Mutex
+	trackers      map[string]*idleTracker
+	schedules     map[string]*models.Schedule
+	stacks        map[string]*models.Stack  // keyed by stack Name (compose project)
+	stackTrackers map[string]*idleTracker   // keyed by stack ID
+	cancel        context.CancelFunc
 }
 
 func NewManager(docker OnDemandDockerClient, store *store.Store) *OnDemandManager {
 	return &OnDemandManager{
-		docker:    docker,
-		store:     store,
-		wakeMu:    make(map[string]*sync.Mutex),
-		trackers:  make(map[string]*idleTracker),
-		schedules: make(map[string]*models.Schedule),
+		docker:        docker,
+		store:         store,
+		wakeMu:        make(map[string]*sync.Mutex),
+		trackers:      make(map[string]*idleTracker),
+		schedules:     make(map[string]*models.Schedule),
+		stacks:        make(map[string]*models.Stack),
+		stackTrackers: make(map[string]*idleTracker),
 	}
 }
 
@@ -346,6 +351,161 @@ func selectPort(onDemandURL string, ports []uint16) uint16 {
 	copy(sorted, ports)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
 	return sorted[0]
+}
+
+var ErrStackNotFound = errors.New("no on-demand stack found")
+
+func (m *OnDemandManager) AddStack(stack *models.Stack) {
+	m.mu.Lock()
+	m.stacks[stack.Name] = stack
+	slog.Info("on-demand: watching stack", "stack", stack.Name, "primary", stack.PrimaryContainer)
+
+	var oldTracker *idleTracker
+	if stack.IdleTimeoutSec > 0 {
+		if existing, ok := m.stackTrackers[stack.ID]; ok {
+			oldTracker = existing
+			delete(m.stackTrackers, stack.ID)
+		}
+	}
+	m.mu.Unlock()
+
+	if oldTracker != nil {
+		oldTracker.stop()
+	}
+
+	if !stack.OnDemandEnabled || stack.PrimaryContainer == "" || stack.IdleTimeoutSec <= 0 {
+		return
+	}
+
+	running, err := m.docker.IsRunning(context.Background(), stack.PrimaryContainer)
+	if err != nil {
+		slog.Warn("on-demand: failed to check stack primary running state", "stack", stack.Name, "primary", stack.PrimaryContainer, "error", err)
+		return
+	}
+	if !running {
+		return
+	}
+
+	tracker := newIdleTracker(stack.PrimaryContainer, stack.IdleTimeout(), m.docker)
+	if tracker == nil {
+		return
+	}
+
+	stackName := stack.Name
+	stackID := stack.ID
+	tracker.start(context.Background(), func() {
+		containers, err := m.docker.ListContainers(context.Background())
+		if err != nil {
+			slog.Error("on-demand: stack idle: failed to list containers", "stack", stackName, "error", err)
+			return
+		}
+		for _, c := range containers {
+			if c.StackName != stackName {
+				continue
+			}
+			if err := m.docker.StopContainer(context.Background(), c.Name); err != nil {
+				slog.Warn("on-demand: stack idle: failed to stop container", "stack", stackName, "container", c.Name, "error", err)
+			} else {
+				slog.Info("on-demand: stack idle: stopped container", "stack", stackName, "container", c.Name)
+			}
+		}
+		m.mu.Lock()
+		delete(m.stackTrackers, stackID)
+		delete(m.stacks, stackName)
+		m.mu.Unlock()
+	})
+
+	m.mu.Lock()
+	m.stackTrackers[stack.ID] = tracker
+	m.mu.Unlock()
+	slog.Info("on-demand: started stack idle tracker", "stack", stack.Name, "primary", stack.PrimaryContainer, "timeout", stack.IdleTimeout())
+}
+
+func (m *OnDemandManager) RemoveStack(stackID string) {
+	m.mu.Lock()
+	var tracker *idleTracker
+	if t, ok := m.stackTrackers[stackID]; ok {
+		tracker = t
+		delete(m.stackTrackers, stackID)
+	}
+	for name, st := range m.stacks {
+		if st.ID == stackID {
+			delete(m.stacks, name)
+			break
+		}
+	}
+	m.mu.Unlock()
+
+	if tracker != nil {
+		tracker.stop()
+	}
+	slog.Info("on-demand: removed stack", "stack_id", stackID)
+}
+
+func (m *OnDemandManager) WakeStack(ctx context.Context, stackName string) (*WakeResult, error) {
+	m.mu.Lock()
+	stack, ok := m.stacks[stackName]
+	m.mu.Unlock()
+
+	if !ok {
+		return nil, ErrStackNotFound
+	}
+
+	containers, err := m.docker.ListContainers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers for stack %q: %w", stackName, err)
+	}
+
+	allRunning := true
+	for _, c := range containers {
+		if c.StackName != stackName {
+			continue
+		}
+		if c.State != "running" {
+			allRunning = false
+			if err := m.docker.StartContainer(ctx, c.Name); err != nil {
+				return nil, fmt.Errorf("failed to start container %q in stack %q: %w", c.Name, stackName, err)
+			}
+			slog.Info("on-demand: started stack container", "stack", stackName, "container", c.Name)
+		}
+	}
+
+	if allRunning {
+		slog.Info("on-demand: stack already running", "stack", stackName)
+		return &WakeResult{Running: true, OnDemandURL: stack.OnDemandURL}, nil
+	}
+
+	return &WakeResult{Running: false, OnDemandURL: stack.OnDemandURL}, nil
+}
+
+func (m *OnDemandManager) CheckStackHealth(ctx context.Context, stackName string) (*HealthResult, error) {
+	m.mu.Lock()
+	stack, ok := m.stacks[stackName]
+	m.mu.Unlock()
+
+	if !ok {
+		return nil, ErrStackNotFound
+	}
+
+	// Delegate to existing health check logic using the primary container.
+	primarySched := &models.Schedule{
+		ContainerName:   stack.PrimaryContainer,
+		OnDemandURL:     stack.OnDemandURL,
+		StartupDelaySec: stack.StartupDelaySec,
+		IdleTimeoutSec:  stack.IdleTimeoutSec,
+	}
+
+	m.mu.Lock()
+	m.schedules[stack.PrimaryContainer] = primarySched
+	m.mu.Unlock()
+
+	result, err := m.CheckHealth(ctx, stack.PrimaryContainer)
+
+	m.mu.Lock()
+	delete(m.schedules, stack.PrimaryContainer)
+	m.mu.Unlock()
+
+	return result, err
 }
 
 // buildProbeAddrs returns TCP addresses to try in order:

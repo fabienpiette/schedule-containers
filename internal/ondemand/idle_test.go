@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gndm/schedule-containers/internal/docker"
+	"github.com/gndm/schedule-containers/internal/models"
 )
 
 type mockStatsDocker struct {
@@ -47,6 +48,10 @@ func (m *mockStatsDocker) ContainerStats(ctx context.Context, name string) (<-ch
 		return nil, m.statsErr
 	}
 	return m.statsCh, nil
+}
+
+func (m *mockStatsDocker) ListContainers(ctx context.Context) ([]models.Container, error) {
+	return nil, nil
 }
 
 func (m *mockStatsDocker) getStopped() []string {

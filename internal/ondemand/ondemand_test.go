@@ -66,6 +66,10 @@ func (m *mockOnDemandDocker) ContainerStats(ctx context.Context, name string) (<
 	return ch, nil
 }
 
+func (m *mockOnDemandDocker) ListContainers(ctx context.Context) ([]models.Container, error) {
+	return nil, nil
+}
+
 func (m *mockOnDemandDocker) getStarted() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
