@@ -5,63 +5,7 @@
 
 <p>Stack schedules target Docker Compose projects. All containers with the matching <code>com.docker.compose.project</code> label are started/stopped together.</p>
 
-<button class="btn-primary" onclick="document.getElementById('stack-dialog').showModal()">Add Stack Schedule</button>
-
-<dialog id="stack-dialog" class="dialog-card">
-  <form id="stack-form" onsubmit="submitStackForm(event)">
-    <h2>Stack Schedule</h2>
-
-    <div class="form-group">
-      <label for="stack-name">Compose Project Name</label>
-      <input type="text" name="name" id="stack-name" class="form-input" placeholder="e.g. myapp" required>
-      <small>Matches the <code>com.docker.compose.project</code> label exactly.</small>
-
-      <label for="stack-display-name">Display Name (optional)</label>
-      <input type="text" name="display_name" id="stack-display-name" class="form-input" placeholder="e.g. My App">
-
-      <label for="stack-start-cron">Start Cron</label>
-      <input type="text" name="start_cron" id="stack-start-cron" class="form-input" placeholder="0 8 * * 1-5">
-      <small>Leave blank if cron start not needed.</small>
-
-      <label for="stack-stop-cron">Stop Cron</label>
-      <input type="text" name="stop_cron" id="stack-stop-cron" class="form-input" placeholder="0 18 * * 1-5">
-      <small>Leave blank if cron stop not needed.</small>
-
-      <label>
-        <input type="checkbox" name="on_demand_enabled" id="stack-on-demand" onchange="toggleStackOnDemand()">
-        Enable On-Demand Wake
-      </label>
-
-      <div id="stack-on-demand-fields" style="display:none">
-        <label for="stack-on-demand-url">On-Demand URL</label>
-        <input type="text" name="on_demand_url" id="stack-on-demand-url" class="form-input" placeholder="https://myapp.example.com">
-
-        <label for="stack-primary-container">Primary Container</label>
-        <select name="primary_container" id="stack-primary-container" class="form-select">
-          <option value="">-- Select primary container --</option>
-          {{range .Containers}}
-          <option value="{{.}}">{{.}}</option>
-          {{end}}
-        </select>
-        <small>Health checks and idle tracking watch this container only.</small>
-
-        <label for="stack-idle-timeout">Idle Timeout (seconds, 0 = disabled)</label>
-        <input type="number" name="idle_timeout_sec" id="stack-idle-timeout" class="form-input" value="0" min="0">
-
-        <label for="stack-startup-delay">Startup Delay (seconds)</label>
-        <input type="number" name="startup_delay_sec" id="stack-startup-delay" class="form-input" value="0" min="0">
-      </div>
-
-      <label class="check-label">
-        <input type="checkbox" name="enabled" checked>
-        <span>Enabled</span>
-      </label>
-
-      <button type="submit" class="btn-primary">Save</button>
-      <button type="button" class="btn-ghost" onclick="document.getElementById('stack-dialog').close()">Cancel</button>
-    </div>
-  </form>
-</dialog>
+<a href="/schedules?mode=stack" class="btn-primary">Add Stack Schedule</a>
 
 {{if .Stacks}}
 <table class="data-table">
@@ -100,32 +44,8 @@
   </tbody>
 </table>
 {{else}}
-<p class="muted">No stack schedules yet.</p>
+<p class="muted">No stack schedules yet. <a href="/schedules?mode=stack">Create one</a>.</p>
+{{end}}
 {{end}}
 
-<script>
-function toggleStackOnDemand() {
-  var cb = document.getElementById('stack-on-demand');
-  document.getElementById('stack-on-demand-fields').style.display = cb.checked ? '' : 'none';
-}
-
-function submitStackForm(e) {
-  e.preventDefault();
-  var form = e.target;
-  var data = {
-    name: form.name.value,
-    display_name: form.display_name.value,
-    start_cron: form.start_cron.value,
-    stop_cron: form.stop_cron.value,
-    enabled: form.enabled.checked,
-    on_demand_enabled: form.on_demand_enabled.checked,
-    on_demand_url: form.on_demand_url ? form.on_demand_url.value : '',
-    primary_container: form.primary_container ? form.primary_container.value : '',
-    idle_timeout_sec: parseInt(form.idle_timeout_sec ? form.idle_timeout_sec.value : '0') || 0,
-    startup_delay_sec: parseInt(form.startup_delay_sec ? form.startup_delay_sec.value : '0') || 0,
-  };
-  fetch('/api/stacks', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
-    .then(function(r) { if (r.ok) { location.reload(); } else { return r.text().then(function(t) { alert('Error: ' + t); }); } });
-}
-</script>
-{{end}}
+{{define "scripts"}}{{end}}
