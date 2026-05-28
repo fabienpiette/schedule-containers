@@ -92,6 +92,7 @@ type SchedulesData struct {
 	Title      string
 	Containers []ContainerView
 	Schedules  []ScheduleView
+	Stacks     []StackView
 	Mode       string
 }
 
@@ -103,12 +104,6 @@ type PresetsData struct {
 type StackView struct {
 	models.Stack
 	ContainerCount int
-}
-
-type StacksData struct {
-	Title      string
-	Stacks     []StackView
-	Containers []string
 }
 
 type TagsData struct {
@@ -317,12 +312,27 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 		containerViews[i] = ContainerView{ID: c.ID, Name: c.Name}
 	}
 
+	countByStack := make(map[string]int)
+	for _, c := range containers {
+		if c.StackName != "" {
+			countByStack[c.StackName]++
+		}
+	}
+	stackViews := make([]StackView, len(stacks))
+	for i, st := range stacks {
+		stackViews[i] = StackView{
+			Stack:          st,
+			ContainerCount: countByStack[st.Name],
+		}
+	}
+
 	mode := r.URL.Query().Get("mode")
 
 	s.renderPage(w, "schedules.html", SchedulesData{
 		Title:      "Schedules",
 		Containers: containerViews,
 		Schedules:  buildScheduleViews(schedules, tagCache, stackNameSet),
+		Stacks:     stackViews,
 		Mode:       mode,
 	})
 }
@@ -437,37 +447,6 @@ func (s *Server) handleWakeStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"healthy": result.Healthy,
 		"url":     result.OnDemandURL,
-	})
-}
-
-func (s *Server) handleStacks(w http.ResponseWriter, r *http.Request) {
-	stacks, _ := s.store.ListStacks(r.Context())
-	containers, _ := s.docker.ListContainers(r.Context())
-
-	containerNames := make([]string, len(containers))
-	for i, c := range containers {
-		containerNames[i] = c.Name
-	}
-
-	countByStack := make(map[string]int)
-	for _, c := range containers {
-		if c.StackName != "" {
-			countByStack[c.StackName]++
-		}
-	}
-
-	views := make([]StackView, len(stacks))
-	for i, st := range stacks {
-		views[i] = StackView{
-			Stack:          st,
-			ContainerCount: countByStack[st.Name],
-		}
-	}
-
-	s.renderPage(w, "stacks.html", StacksData{
-		Title:      "Stacks",
-		Stacks:     views,
-		Containers: containerNames,
 	})
 }
 

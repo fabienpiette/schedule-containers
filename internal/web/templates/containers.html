@@ -21,7 +21,7 @@
             <td class="cell-name">{{.Name}}</td>
             <td class="muted">{{.Image}}</td>
             <td>{{if eq .State "running"}}<span class="badge badge-success">running</span>{{else}}<span class="badge badge-danger">{{.State}}</span>{{end}}</td>
-            <td class="muted">{{if .StackName}}{{if .StackScheduled}}<a href="/stacks">{{.StackName}}</a>{{else}}{{.StackName}}{{end}}{{end}}</td>
+            <td class="muted">{{if .StackName}}{{.StackName}}{{end}}</td>
             <td>
                 {{if .TagName}}
                 <span class="badge badge-tag">{{.TagName}}</span>
