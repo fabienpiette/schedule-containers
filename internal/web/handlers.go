@@ -92,6 +92,7 @@ type SchedulesData struct {
 	Title      string
 	Containers []ContainerView
 	Schedules  []ScheduleView
+	Mode       string
 }
 
 type PresetsData struct {
@@ -316,10 +317,13 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 		containerViews[i] = ContainerView{ID: c.ID, Name: c.Name}
 	}
 
+	mode := r.URL.Query().Get("mode")
+
 	s.renderPage(w, "schedules.html", SchedulesData{
 		Title:      "Schedules",
 		Containers: containerViews,
 		Schedules:  buildScheduleViews(schedules, tagCache, stackNameSet),
+		Mode:       mode,
 	})
 }
 
