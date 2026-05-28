@@ -3,6 +3,12 @@
 {{define "content"}}
 <h1>Schedules</h1>
 
+<div class="mode-toggle">
+    <button type="button" class="mode-toggle-btn {{if eq .Mode "stack"}}{{else}}active{{end}}" id="mode-container" onclick="switchMode('container')">Container</button>
+    <button type="button" class="mode-toggle-btn {{if eq .Mode "stack"}}active{{end}}" id="mode-stack" onclick="switchMode('stack')">Stack</button>
+</div>
+
+<div id="container-fields" class="mode-fields {{if eq .Mode "stack"}}{{else}}active{{end}}">
 <form id="schedule-form">
 <div class="form-group">
     <label for="container_name">Container</label>
@@ -21,7 +27,7 @@
         <option value="">-- Select a preset or type custom --</option>
     </select>
     <label for="start_cron">Start Cron Expression</label>
-    <input type="text" name="start_cron" id="start_cron" class="form-input" placeholder="0 8 * * 1-5">
+    <input type="text" name="start_cron" id="start_cron" class="form-input" placeholder="0 8 * * 1-5" required>
     <small id="start-cron-hint">Standard 5-field format: min hour day month weekday</small>
 
     <label for="stop_preset">Stop Cron Preset</label>
@@ -29,7 +35,7 @@
         <option value="">-- Select a preset or type custom --</option>
     </select>
     <label for="stop_cron">Stop Cron Expression</label>
-    <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5">
+    <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5" required>
     <small id="stop-cron-hint">Standard 5-field format: min hour day month weekday</small>
 
     <div class="ondemand-panel" id="ondemand-panel">
@@ -86,6 +92,98 @@
     <button type="submit" class="btn-primary">Create Schedule</button>
 </div>
 </form>
+</div>
+
+<div id="stack-fields" class="mode-fields {{if eq .Mode "stack"}}active{{end}}">
+<form id="stack-form">
+<div class="form-group">
+    <label for="stack-name">Compose Project</label>
+    <select name="name" id="stack-name" class="form-select" required>
+        <option value="">Loading stacks...</option>
+    </select>
+    <small>Matches the <code>com.docker.compose.project</code> label exactly.</small>
+
+    <label for="stack-display-name">Display Name (optional)</label>
+    <input type="text" name="display_name" id="stack-display-name" class="form-input" placeholder="e.g. My App">
+
+    <label for="stack-start-preset">Start Cron Preset</label>
+    <select id="stack-start-preset" class="form-select">
+        <option value="">-- Select a preset or type custom --</option>
+    </select>
+    <label for="stack-start-cron">Start Cron Expression</label>
+    <input type="text" name="start_cron" id="stack-start-cron" class="form-input" placeholder="0 8 * * 1-5">
+    <small id="stack-start-cron-hint">Leave blank if cron start not needed.</small>
+
+    <label for="stack-stop-preset">Stop Cron Preset</label>
+    <select id="stack-stop-preset" class="form-select">
+        <option value="">-- Select a preset or type custom --</option>
+    </select>
+    <label for="stack-stop-cron">Stop Cron Expression</label>
+    <input type="text" name="stop_cron" id="stack-stop-cron" class="form-input" placeholder="0 18 * * 1-5">
+    <small id="stack-stop-cron-hint">Leave blank if cron stop not needed.</small>
+
+    <div class="ondemand-panel" id="stack-ondemand-panel">
+        <div class="ondemand-header">
+            <div class="ondemand-header-left">
+                <svg class="ondemand-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                    <path d="M7.5 1.5v4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M5 3.5A5.5 5.5 0 1010 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                </svg>
+                <div class="ondemand-header-text">
+                    <span class="ondemand-title">Wake-on-Access</span>
+                    <span class="ondemand-desc">Start stack on request · stop when idle</span>
+                </div>
+            </div>
+            <label class="toggle-switch" title="Enable wake-on-access">
+                <input type="checkbox" id="stack-on-demand">
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+        </div>
+        <div class="ondemand-body" id="stack-ondemand-fields">
+            <div class="ondemand-body-inner">
+                <div class="ondemand-fields-grid">
+                    <div class="ondemand-field">
+                        <label for="stack-on-demand-url" class="field-label">Destination URL</label>
+                        <input type="text" id="stack-on-demand-url" class="form-input" placeholder="https://myapp.example.com">
+                        <small>Redirect target once stack is ready</small>
+                    </div>
+                    <div class="ondemand-field">
+                        <label for="stack-primary-container" class="field-label">Primary Container</label>
+                        <select id="stack-primary-container" class="form-select">
+                            <option value="">-- Select primary container --</option>
+                        </select>
+                        <small>Health checks and idle tracking watch this container only.</small>
+                    </div>
+                    <div class="ondemand-field">
+                        <label for="stack-startup-delay" class="field-label">Startup Delay</label>
+                        <div class="input-suffix-wrap">
+                            <input type="number" id="stack-startup-delay" class="form-input" value="0" min="0">
+                            <span class="input-suffix">seconds</span>
+                        </div>
+                        <small>Redirect after this many seconds · 0 = TCP probe only</small>
+                    </div>
+                    <div class="ondemand-field">
+                        <label for="stack-idle-timeout" class="field-label">Idle Timeout</label>
+                        <div class="input-suffix-wrap">
+                            <input type="number" id="stack-idle-timeout" class="form-input" value="0" min="0">
+                            <span class="input-suffix">seconds</span>
+                        </div>
+                        <small>Auto-stop after inactivity · 0 = disabled</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <label class="check-label">
+        <input type="checkbox" id="stack-enabled" checked>
+        <span>Enabled</span>
+    </label>
+
+    <button type="submit" class="btn-primary">Create Stack Schedule</button>
+</div>
+</form>
+</div>
 
 <h2>All Schedules</h2>
 <table class="data-table">
@@ -123,17 +221,95 @@
 
 {{define "scripts"}}
 <script>
-document.getElementById('start_preset').addEventListener('change', function() {
-    if (this.value) {
-        document.getElementById('start_cron').value = this.value;
+var allContainers = [];
+var currentMode = '{{if eq .Mode "stack"}}stack{{else}}container{{end}}';
+
+function switchMode(mode) {
+    currentMode = mode;
+    var containerFields = document.getElementById('container-fields');
+    var stackFields = document.getElementById('stack-fields');
+    var modeBtnContainer = document.getElementById('mode-container');
+    var modeBtnStack = document.getElementById('mode-stack');
+    if (mode === 'container') {
+        containerFields.classList.add('active');
+        stackFields.classList.remove('active');
+        modeBtnContainer.classList.add('active');
+        modeBtnStack.classList.remove('active');
+        clearStackFields();
+    } else {
+        stackFields.classList.add('active');
+        containerFields.classList.remove('active');
+        modeBtnStack.classList.add('active');
+        modeBtnContainer.classList.remove('active');
+        clearContainerFields();
     }
+}
+
+function clearContainerFields() {
+    var f = document.getElementById('schedule-form');
+    if (!f) return;
+    f.container_name.selectedIndex = 0;
+    f.display_name.value = '';
+    f.start_cron.value = '';
+    f.stop_cron.value = '';
+    f.on_demand_enabled.checked = false;
+    f.on_demand_url.value = '';
+    f.startup_delay_sec.value = '0';
+    f.idle_timeout_sec.value = '0';
+    document.getElementById('ondemand-fields').classList.remove('expanded');
+    document.getElementById('ondemand-panel').classList.remove('is-enabled');
+    f.start_cron.setAttribute('required', '');
+    f.stop_cron.setAttribute('required', '');
+    document.getElementById('start-cron-hint').textContent = 'Standard 5-field format: min hour day month weekday';
+    document.getElementById('stop-cron-hint').textContent = 'Standard 5-field format: min hour day month weekday';
+}
+
+function clearStackFields() {
+    var stackName = document.getElementById('stack-name');
+    var stackDisplayName = document.getElementById('stack-display-name');
+    var stackStartCron = document.getElementById('stack-start-cron');
+    var stackStopCron = document.getElementById('stack-stop-cron');
+    var stackOnDemand = document.getElementById('stack-on-demand');
+    var stackOnDemandUrl = document.getElementById('stack-on-demand-url');
+    var stackPrimaryContainer = document.getElementById('stack-primary-container');
+    var stackStartupDelay = document.getElementById('stack-startup-delay');
+    var stackIdleTimeout = document.getElementById('stack-idle-timeout');
+    var stackEnabled = document.getElementById('stack-enabled');
+    if (stackName) stackName.selectedIndex = 0;
+    if (stackDisplayName) stackDisplayName.value = '';
+    if (stackStartCron) stackStartCron.value = '';
+    if (stackStopCron) stackStopCron.value = '';
+    if (stackOnDemand) stackOnDemand.checked = false;
+    if (stackOnDemandUrl) stackOnDemandUrl.value = '';
+    if (stackPrimaryContainer) stackPrimaryContainer.selectedIndex = 0;
+    if (stackStartupDelay) stackStartupDelay.value = '0';
+    if (stackIdleTimeout) stackIdleTimeout.value = '0';
+    if (stackEnabled) stackEnabled.checked = true;
+    var onDemandFields = document.getElementById('stack-ondemand-fields');
+    var onDemandPanel = document.getElementById('stack-ondemand-panel');
+    if (onDemandFields) onDemandFields.classList.remove('expanded');
+    if (onDemandPanel) onDemandPanel.classList.remove('is-enabled');
+    document.getElementById('stack-start-cron-hint').textContent = 'Leave blank if cron start not needed.';
+    document.getElementById('stack-stop-cron-hint').textContent = 'Leave blank if cron stop not needed.';
+}
+
+// Container mode: preset dropdowns
+document.getElementById('start_preset').addEventListener('change', function() {
+    if (this.value) document.getElementById('start_cron').value = this.value;
 });
 document.getElementById('stop_preset').addEventListener('change', function() {
-    if (this.value) {
-        document.getElementById('stop_cron').value = this.value;
-    }
+    if (this.value) document.getElementById('stop_cron').value = this.value;
 });
 
+// Stack mode: preset dropdowns
+document.getElementById('stack-start-preset').addEventListener('change', function() {
+    if (this.value) document.getElementById('stack-start-cron').value = this.value;
+});
+document.getElementById('stack-stop-preset').addEventListener('change', function() {
+    if (this.value) document.getElementById('stack-stop-cron').value = this.value;
+});
+
+// Load presets into all dropdowns
 fetch('/api/presets')
     .then(function(r) { return r.json(); })
     .then(function(presets) {
@@ -142,8 +318,9 @@ fetch('/api/presets')
             if (!categories[p.category]) categories[p.category] = [];
             categories[p.category].push(p);
         });
-        ['start_preset', 'stop_preset'].forEach(function(selId) {
+        ['start_preset', 'stop_preset', 'stack-start-preset', 'stack-stop-preset'].forEach(function(selId) {
             var sel = document.getElementById(selId);
+            if (!sel) return;
             Object.keys(categories).forEach(function(cat) {
                 var group = document.createElement('optgroup');
                 group.label = cat;
@@ -158,36 +335,50 @@ fetch('/api/presets')
         });
     });
 
-document.getElementById('schedule-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var form = e.target;
-    var data = {
-        container_name: form.container_name.value,
-        display_name: form.display_name.value,
-        start_cron: form.start_cron.value,
-        stop_cron: form.stop_cron.value,
-        enabled: form.enabled.checked,
-        on_demand_enabled: form.on_demand_enabled.checked,
-        on_demand_url: form.on_demand_url.value,
-        startup_delay_sec: parseInt(form.startup_delay_sec.value) || 0,
-        idle_timeout_sec: parseInt(form.idle_timeout_sec.value) || 0
-    };
-    fetch('/api/schedules', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-    }).then(function(r) {
-        if (r.ok) {
-            showToast('Schedule created');
-            window.location.href = '/';
-        } else {
-            return r.text().then(function(t) { throw new Error(t); });
+// Load containers for stack dropdown
+fetch('/api/containers')
+    .then(function(r) { return r.json(); })
+    .then(function(containers) {
+        allContainers = containers;
+        var stackNames = {};
+        containers.forEach(function(c) {
+            if (c.stack_name) stackNames[c.stack_name] = true;
+        });
+        var stackSelect = document.getElementById('stack-name');
+        stackSelect.innerHTML = '<option value="">-- Select a compose project --</option>';
+        var sortedNames = Object.keys(stackNames).sort();
+        if (sortedNames.length === 0) {
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No compose stacks available';
+            opt.disabled = true;
+            stackSelect.appendChild(opt);
         }
-    }).catch(function(err) {
-        showToast(err.message, 'error');
+        sortedNames.forEach(function(name) {
+            var opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            stackSelect.appendChild(opt);
+        });
     });
+
+document.getElementById('stack-name').addEventListener('change', function() {
+    var selectedStack = this.value;
+    var primarySelect = document.getElementById('stack-primary-container');
+    primarySelect.innerHTML = '<option value="">-- Select primary container --</option>';
+    if (selectedStack) {
+        allContainers.forEach(function(c) {
+            if (c.stack_name === selectedStack) {
+                var opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = c.name;
+                primarySelect.appendChild(opt);
+            }
+        });
+    }
 });
 
+// Container mode: on-demand toggle
 document.getElementById('on_demand_enabled').addEventListener('change', function() {
     var onDemandFields = document.getElementById('ondemand-fields');
     var panel = document.getElementById('ondemand-panel');
@@ -210,6 +401,77 @@ document.getElementById('on_demand_enabled').addEventListener('change', function
         startHint.textContent = 'Standard 5-field format: min hour day month weekday';
         stopHint.textContent = 'Standard 5-field format: min hour day month weekday';
     }
+});
+
+// Stack mode: on-demand toggle
+document.getElementById('stack-on-demand').addEventListener('change', function() {
+    var onDemandFields = document.getElementById('stack-ondemand-fields');
+    var panel = document.getElementById('stack-ondemand-panel');
+    if (this.checked) {
+        onDemandFields.classList.add('expanded');
+        panel.classList.add('is-enabled');
+    } else {
+        onDemandFields.classList.remove('expanded');
+        panel.classList.remove('is-enabled');
+    }
+});
+
+// Container mode: submit
+document.getElementById('schedule-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var form = e.target;
+    var data = {
+        container_name: form.container_name.value,
+        display_name: form.display_name.value,
+        start_cron: form.start_cron.value,
+        stop_cron: form.stop_cron.value,
+        enabled: form.enabled.checked,
+        on_demand_enabled: form.on_demand_enabled.checked,
+        on_demand_url: form.on_demand_url.value,
+        startup_delay_sec: parseInt(form.startup_delay_sec.value) || 0,
+        idle_timeout_sec: parseInt(form.idle_timeout_sec.value) || 0
+    };
+    fetch('/api/schedules', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(function(r) {
+        if (r.ok) {
+            showToast('Schedule created');
+            window.location.href = '/schedules';
+        } else {
+            return r.text().then(function(t) { throw new Error(t); });
+        }
+    }).catch(function(err) { showToast(err.message, 'error'); });
+});
+
+// Stack mode: submit
+document.getElementById('stack-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var data = {
+        name: document.getElementById('stack-name').value,
+        display_name: document.getElementById('stack-display-name').value,
+        start_cron: document.getElementById('stack-start-cron').value,
+        stop_cron: document.getElementById('stack-stop-cron').value,
+        enabled: document.getElementById('stack-enabled').checked,
+        on_demand_enabled: document.getElementById('stack-on-demand').checked,
+        on_demand_url: document.getElementById('stack-on-demand-url').value,
+        primary_container: document.getElementById('stack-primary-container').value,
+        idle_timeout_sec: parseInt(document.getElementById('stack-idle-timeout').value) || 0,
+        startup_delay_sec: parseInt(document.getElementById('stack-startup-delay').value) || 0
+    };
+    fetch('/api/stacks', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(function(r) {
+        if (r.ok) {
+            showToast('Stack schedule created');
+            window.location.href = '/schedules';
+        } else {
+            return r.text().then(function(t) { throw new Error(t); });
+        }
+    }).catch(function(err) { showToast(err.message, 'error'); });
 });
 </script>
 {{end}}
