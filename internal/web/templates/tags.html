@@ -3,32 +3,36 @@
 {{define "content"}}
 <h1>Tags</h1>
 
-<form id="tag-form">
-<div class="form-group">
-    <label for="name">Name</label>
-    <input type="text" name="name" id="name" class="form-input" placeholder="e.g. business-hours" required>
+<button class="btn-primary" onclick="document.getElementById('tag-dialog').showModal()">Create Tag</button>
 
-    <label for="start_preset">Start Cron Preset</label>
-    <select id="start_preset" class="form-select">
-        <option value="">-- Select a preset or type custom --</option>
-    </select>
-    <label for="start_cron">Start Cron Expression</label>
-    <input type="text" name="start_cron" id="start_cron" class="form-input" placeholder="0 8 * * 1-5" required>
-    <small>Standard 5-field format: min hour day month weekday</small>
+<dialog id="tag-dialog" class="dialog-card">
+  <form id="tag-form">
+    <h2>Create Tag</h2>
+    <div class="form-group">
+        <label for="name">Name</label>
+        <input type="text" name="name" id="name" class="form-input" placeholder="e.g. business-hours" required>
 
-    <label for="stop_preset">Stop Cron Preset</label>
-    <select id="stop_preset" class="form-select">
-        <option value="">-- Select a preset or type custom --</option>
-    </select>
-    <label for="stop_cron">Stop Cron Expression</label>
-    <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5" required>
-    <small>Standard 5-field format: min hour day month weekday</small>
+        <label for="start_preset">Start Cron Preset</label>
+        <select id="start_preset" class="form-select">
+            <option value="">-- Select a preset or type custom --</option>
+        </select>
+        <label for="start_cron">Start Cron Expression</label>
+        <input type="text" name="start_cron" id="start_cron" class="form-input" placeholder="0 8 * * 1-5" required>
+        <small>Standard 5-field format: min hour day month weekday</small>
 
-    <button type="submit" class="btn-primary">Create Tag</button>
-</div>
-</form>
+        <label for="stop_preset">Stop Cron Preset</label>
+        <select id="stop_preset" class="form-select">
+            <option value="">-- Select a preset or type custom --</option>
+        </select>
+        <label for="stop_cron">Stop Cron Expression</label>
+        <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5" required>
+        <small>Standard 5-field format: min hour day month weekday</small>
 
-<h2>Tags</h2>
+        <button type="submit" class="btn-primary">Create Tag</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('tag-dialog').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
 
 {{if .Tags}}
 <table class="data-table">
@@ -86,7 +90,7 @@
     </tbody>
 </table>
 {{else}}
-<p class="muted">No tags configured. Create one above.</p>
+<p class="muted">No tags configured. Create one to get started.</p>
 {{end}}
 {{end}}
 

@@ -3,6 +3,31 @@
 {{define "content"}}
 <h1>Presets</h1>
 
+<button class="btn-primary" onclick="document.getElementById('preset-dialog').showModal()">Create Preset</button>
+
+<dialog id="preset-dialog" class="dialog-card">
+  <form id="preset-form">
+    <h2>Create Preset</h2>
+    <div class="form-group">
+        <label for="label">Label</label>
+        <input type="text" name="label" id="label" class="form-input" placeholder="e.g. Weekdays at 10am" required>
+
+        <label for="expression">Cron Expression</label>
+        <input type="text" name="expression" id="expression" class="form-input" placeholder="0 10 * * 1-5" required>
+        <small>Standard 5-field format: min hour day month weekday</small>
+
+        <label for="category">Category</label>
+        <input type="text" name="category" id="category" class="form-input" value="Custom">
+
+        <label for="description">Description</label>
+        <input type="text" name="description" id="description" class="form-input" placeholder="Weekdays at 10:00 AM">
+
+        <button type="submit" class="btn-primary">Create Preset</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('preset-dialog').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
 {{if .Presets}}
 <table class="data-table">
     <thead>
@@ -35,26 +60,6 @@
 {{else}}
 <p class="muted">No presets found.</p>
 {{end}}
-
-<h2>Create Preset</h2>
-<form id="preset-form">
-<div class="form-group">
-    <label for="label">Label</label>
-    <input type="text" name="label" id="label" class="form-input" placeholder="e.g. Weekdays at 10am" required>
-
-    <label for="expression">Cron Expression</label>
-    <input type="text" name="expression" id="expression" class="form-input" placeholder="0 10 * * 1-5" required>
-    <small>Standard 5-field format: min hour day month weekday</small>
-
-    <label for="category">Category</label>
-    <input type="text" name="category" id="category" class="form-input" value="Custom">
-
-    <label for="description">Description</label>
-    <input type="text" name="description" id="description" class="form-input" placeholder="Weekdays at 10:00 AM">
-
-    <button type="submit" class="btn-primary">Create Preset</button>
-</div>
-</form>
 {{end}}
 
 {{define "scripts"}}

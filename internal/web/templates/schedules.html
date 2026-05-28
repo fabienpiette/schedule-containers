@@ -3,187 +3,193 @@
 {{define "content"}}
 <h1>Schedules</h1>
 
-<div class="mode-toggle">
-    <button type="button" class="mode-toggle-btn {{if eq .Mode "stack"}}{{else}}active{{end}}" id="mode-container" onclick="switchMode('container')">Container</button>
-    <button type="button" class="mode-toggle-btn {{if eq .Mode "stack"}}active{{end}}" id="mode-stack" onclick="switchMode('stack')">Stack</button>
-</div>
+<button class="btn-primary" onclick="document.getElementById('schedule-dialog').showModal()">Create Schedule</button>
 
-<div id="container-fields" class="mode-fields {{if eq .Mode "stack"}}{{else}}active{{end}}">
-<form id="schedule-form">
-<div class="form-group">
-    <label for="container_name">Container</label>
-    <select name="container_name" id="container_name" class="form-select" required>
-        <option value="">Select a container...</option>
-        {{range .Containers}}
-        <option value="{{.Name}}">{{.Name}}</option>
-        {{end}}
-    </select>
+<dialog id="schedule-dialog" class="dialog-card">
+  <div class="mode-toggle">
+      <button type="button" class="mode-toggle-btn {{if eq .Mode "stack"}}{{else}}active{{end}}" id="mode-container" onclick="switchMode('container')">Container</button>
+      <button type="button" class="mode-toggle-btn {{if eq .Mode "stack"}}active{{end}}" id="mode-stack" onclick="switchMode('stack')">Stack</button>
+  </div>
 
-    <label for="display_name">Display Name</label>
-    <input type="text" name="display_name" id="display_name" class="form-input">
+  <div id="container-fields" class="mode-fields {{if eq .Mode "stack"}}{{else}}active{{end}}">
+  <form id="schedule-form">
+  <div class="form-group">
+      <label for="container_name">Container</label>
+      <select name="container_name" id="container_name" class="form-select" required>
+          <option value="">Select a container...</option>
+          {{range .Containers}}
+          <option value="{{.Name}}">{{.Name}}</option>
+          {{end}}
+      </select>
 
-    <label for="start_preset">Start Cron Preset</label>
-    <select id="start_preset" class="form-select">
-        <option value="">-- Select a preset or type custom --</option>
-    </select>
-    <label for="start_cron">Start Cron Expression</label>
-    <input type="text" name="start_cron" id="start_cron" class="form-input" placeholder="0 8 * * 1-5" required>
-    <small id="start-cron-hint">Standard 5-field format: min hour day month weekday</small>
+      <label for="display_name">Display Name</label>
+      <input type="text" name="display_name" id="display_name" class="form-input">
 
-    <label for="stop_preset">Stop Cron Preset</label>
-    <select id="stop_preset" class="form-select">
-        <option value="">-- Select a preset or type custom --</option>
-    </select>
-    <label for="stop_cron">Stop Cron Expression</label>
-    <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5" required>
-    <small id="stop-cron-hint">Standard 5-field format: min hour day month weekday</small>
+      <label for="start_preset">Start Cron Preset</label>
+      <select id="start_preset" class="form-select">
+          <option value="">-- Select a preset or type custom --</option>
+      </select>
+      <label for="start_cron">Start Cron Expression</label>
+      <input type="text" name="start_cron" id="start_cron" class="form-input" placeholder="0 8 * * 1-5" required>
+      <small id="start-cron-hint">Standard 5-field format: min hour day month weekday</small>
 
-    <div class="ondemand-panel" id="ondemand-panel">
-        <div class="ondemand-header">
-            <div class="ondemand-header-left">
-                <svg class="ondemand-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
-                    <path d="M7.5 1.5v4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    <path d="M5 3.5A5.5 5.5 0 1010 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-                </svg>
-                <div class="ondemand-header-text">
-                    <span class="ondemand-title">Wake-on-Access</span>
-                    <span class="ondemand-desc">Start on request · stop when idle</span>
-                </div>
-            </div>
-            <label class="toggle-switch" title="Enable wake-on-access">
-                <input type="checkbox" name="on_demand_enabled" id="on_demand_enabled">
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
-        </div>
-        <div class="ondemand-body" id="ondemand-fields">
-            <div class="ondemand-body-inner">
-                <div class="ondemand-fields-grid">
-                    <div class="ondemand-field">
-                        <label for="on_demand_url" class="field-label">Destination URL</label>
-                        <input type="text" name="on_demand_url" id="on_demand_url" class="form-input" placeholder="https://app.example.com">
-                        <small>Redirect target once container is ready</small>
-                    </div>
-                    <div class="ondemand-field">
-                        <label for="startup_delay_sec" class="field-label">Startup Delay</label>
-                        <div class="input-suffix-wrap">
-                            <input type="number" name="startup_delay_sec" id="startup_delay_sec" class="form-input" placeholder="15" value="0" min="0">
-                            <span class="input-suffix">seconds</span>
-                        </div>
-                        <small>Redirect after this many seconds of container uptime · 0 = TCP probe only</small>
-                    </div>
-                    <div class="ondemand-field">
-                        <label for="idle_timeout_sec" class="field-label">Idle Timeout</label>
-                        <div class="input-suffix-wrap">
-                            <input type="number" name="idle_timeout_sec" id="idle_timeout_sec" class="form-input" placeholder="1800" value="0" min="0">
-                            <span class="input-suffix">seconds</span>
-                        </div>
-                        <small>Auto-stop after inactivity · 0 = disabled</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+      <label for="stop_preset">Stop Cron Preset</label>
+      <select id="stop_preset" class="form-select">
+          <option value="">-- Select a preset or type custom --</option>
+      </select>
+      <label for="stop_cron">Stop Cron Expression</label>
+      <input type="text" name="stop_cron" id="stop_cron" class="form-input" placeholder="0 18 * * 1-5" required>
+      <small id="stop-cron-hint">Standard 5-field format: min hour day month weekday</small>
 
-    <label class="check-label">
-        <input type="checkbox" name="enabled" checked>
-        <span>Enabled</span>
-    </label>
+      <div class="ondemand-panel" id="ondemand-panel">
+          <div class="ondemand-header">
+              <div class="ondemand-header-left">
+                  <svg class="ondemand-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                      <path d="M7.5 1.5v4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      <path d="M5 3.5A5.5 5.5 0 1010 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                  </svg>
+                  <div class="ondemand-header-text">
+                      <span class="ondemand-title">Wake-on-Access</span>
+                      <span class="ondemand-desc">Start on request · stop when idle</span>
+                  </div>
+              </div>
+              <label class="toggle-switch" title="Enable wake-on-access">
+                  <input type="checkbox" name="on_demand_enabled" id="on_demand_enabled">
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+          </div>
+          <div class="ondemand-body" id="ondemand-fields">
+              <div class="ondemand-body-inner">
+                  <div class="ondemand-fields-grid">
+                      <div class="ondemand-field">
+                          <label for="on_demand_url" class="field-label">Destination URL</label>
+                          <input type="text" name="on_demand_url" id="on_demand_url" class="form-input" placeholder="https://app.example.com">
+                          <small>Redirect target once container is ready</small>
+                      </div>
+                      <div class="ondemand-field">
+                          <label for="startup_delay_sec" class="field-label">Startup Delay</label>
+                          <div class="input-suffix-wrap">
+                              <input type="number" name="startup_delay_sec" id="startup_delay_sec" class="form-input" placeholder="15" value="0" min="0">
+                              <span class="input-suffix">seconds</span>
+                          </div>
+                          <small>Redirect after this many seconds of container uptime · 0 = TCP probe only</small>
+                      </div>
+                      <div class="ondemand-field">
+                          <label for="idle_timeout_sec" class="field-label">Idle Timeout</label>
+                          <div class="input-suffix-wrap">
+                              <input type="number" name="idle_timeout_sec" id="idle_timeout_sec" class="form-input" placeholder="1800" value="0" min="0">
+                              <span class="input-suffix">seconds</span>
+                          </div>
+                          <small>Auto-stop after inactivity · 0 = disabled</small>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
 
-    <button type="submit" class="btn-primary">Create Schedule</button>
-</div>
-</form>
-</div>
+      <label class="check-label">
+          <input type="checkbox" name="enabled" checked>
+          <span>Enabled</span>
+      </label>
 
-<div id="stack-fields" class="mode-fields {{if eq .Mode "stack"}}active{{end}}">
-<form id="stack-form">
-<div class="form-group">
-    <label for="stack-name">Compose Project</label>
-    <select name="name" id="stack-name" class="form-select" required>
-        <option value="">Loading stacks...</option>
-    </select>
-    <small>Matches the <code>com.docker.compose.project</code> label exactly.</small>
+      <button type="submit" class="btn-primary">Create Schedule</button>
+      <button type="button" class="btn-ghost" onclick="document.getElementById('schedule-dialog').close()">Cancel</button>
+  </div>
+  </form>
+  </div>
 
-    <label for="stack-display-name">Display Name (optional)</label>
-    <input type="text" name="display_name" id="stack-display-name" class="form-input" placeholder="e.g. My App">
+  <div id="stack-fields" class="mode-fields {{if eq .Mode "stack"}}active{{end}}">
+  <form id="stack-form">
+  <div class="form-group">
+      <label for="stack-name">Compose Project</label>
+      <select name="name" id="stack-name" class="form-select" required>
+          <option value="">Loading stacks...</option>
+      </select>
+      <small>Matches the <code>com.docker.compose.project</code> label exactly.</small>
 
-    <label for="stack-start-preset">Start Cron Preset</label>
-    <select id="stack-start-preset" class="form-select">
-        <option value="">-- Select a preset or type custom --</option>
-    </select>
-    <label for="stack-start-cron">Start Cron Expression</label>
-    <input type="text" name="start_cron" id="stack-start-cron" class="form-input" placeholder="0 8 * * 1-5">
-    <small id="stack-start-cron-hint">Leave blank if cron start not needed.</small>
+      <label for="stack-display-name">Display Name (optional)</label>
+      <input type="text" name="display_name" id="stack-display-name" class="form-input" placeholder="e.g. My App">
 
-    <label for="stack-stop-preset">Stop Cron Preset</label>
-    <select id="stack-stop-preset" class="form-select">
-        <option value="">-- Select a preset or type custom --</option>
-    </select>
-    <label for="stack-stop-cron">Stop Cron Expression</label>
-    <input type="text" name="stop_cron" id="stack-stop-cron" class="form-input" placeholder="0 18 * * 1-5">
-    <small id="stack-stop-cron-hint">Leave blank if cron stop not needed.</small>
+      <label for="stack-start-preset">Start Cron Preset</label>
+      <select id="stack-start-preset" class="form-select">
+          <option value="">-- Select a preset or type custom --</option>
+      </select>
+      <label for="stack-start-cron">Start Cron Expression</label>
+      <input type="text" name="start_cron" id="stack-start-cron" class="form-input" placeholder="0 8 * * 1-5">
+      <small id="stack-start-cron-hint">Leave blank if cron start not needed.</small>
 
-    <div class="ondemand-panel" id="stack-ondemand-panel">
-        <div class="ondemand-header">
-            <div class="ondemand-header-left">
-                <svg class="ondemand-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
-                    <path d="M7.5 1.5v4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    <path d="M5 3.5A5.5 5.5 0 1010 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-                </svg>
-                <div class="ondemand-header-text">
-                    <span class="ondemand-title">Wake-on-Access</span>
-                    <span class="ondemand-desc">Start stack on request · stop when idle</span>
-                </div>
-            </div>
-            <label class="toggle-switch" title="Enable wake-on-access">
-                <input type="checkbox" id="stack-on-demand">
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
-        </div>
-        <div class="ondemand-body" id="stack-ondemand-fields">
-            <div class="ondemand-body-inner">
-                <div class="ondemand-fields-grid">
-                    <div class="ondemand-field">
-                        <label for="stack-on-demand-url" class="field-label">Destination URL</label>
-                        <input type="text" id="stack-on-demand-url" class="form-input" placeholder="https://myapp.example.com">
-                        <small>Redirect target once stack is ready</small>
-                    </div>
-                    <div class="ondemand-field">
-                        <label for="stack-primary-container" class="field-label">Primary Container</label>
-                        <select id="stack-primary-container" class="form-select">
-                            <option value="">-- Select primary container --</option>
-                        </select>
-                        <small>Health checks and idle tracking watch this container only.</small>
-                    </div>
-                    <div class="ondemand-field">
-                        <label for="stack-startup-delay" class="field-label">Startup Delay</label>
-                        <div class="input-suffix-wrap">
-                            <input type="number" id="stack-startup-delay" class="form-input" value="0" min="0">
-                            <span class="input-suffix">seconds</span>
-                        </div>
-                        <small>Redirect after this many seconds · 0 = TCP probe only</small>
-                    </div>
-                    <div class="ondemand-field">
-                        <label for="stack-idle-timeout" class="field-label">Idle Timeout</label>
-                        <div class="input-suffix-wrap">
-                            <input type="number" id="stack-idle-timeout" class="form-input" value="0" min="0">
-                            <span class="input-suffix">seconds</span>
-                        </div>
-                        <small>Auto-stop after inactivity · 0 = disabled</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+      <label for="stack-stop-preset">Stop Cron Preset</label>
+      <select id="stack-stop-preset" class="form-select">
+          <option value="">-- Select a preset or type custom --</option>
+      </select>
+      <label for="stack-stop-cron">Stop Cron Expression</label>
+      <input type="text" name="stop_cron" id="stack-stop-cron" class="form-input" placeholder="0 18 * * 1-5">
+      <small id="stack-stop-cron-hint">Leave blank if cron stop not needed.</small>
 
-    <label class="check-label">
-        <input type="checkbox" id="stack-enabled" checked>
-        <span>Enabled</span>
-    </label>
+      <div class="ondemand-panel" id="stack-ondemand-panel">
+          <div class="ondemand-header">
+              <div class="ondemand-header-left">
+                  <svg class="ondemand-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                      <path d="M7.5 1.5v4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      <path d="M5 3.5A5.5 5.5 0 1010 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                  </svg>
+                  <div class="ondemand-header-text">
+                      <span class="ondemand-title">Wake-on-Access</span>
+                      <span class="ondemand-desc">Start stack on request · stop when idle</span>
+                  </div>
+              </div>
+              <label class="toggle-switch" title="Enable wake-on-access">
+                  <input type="checkbox" id="stack-on-demand">
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+          </div>
+          <div class="ondemand-body" id="stack-ondemand-fields">
+              <div class="ondemand-body-inner">
+                  <div class="ondemand-fields-grid">
+                      <div class="ondemand-field">
+                          <label for="stack-on-demand-url" class="field-label">Destination URL</label>
+                          <input type="text" id="stack-on-demand-url" class="form-input" placeholder="https://myapp.example.com">
+                          <small>Redirect target once stack is ready</small>
+                      </div>
+                      <div class="ondemand-field">
+                          <label for="stack-primary-container" class="field-label">Primary Container</label>
+                          <select id="stack-primary-container" class="form-select">
+                              <option value="">-- Select primary container --</option>
+                          </select>
+                          <small>Health checks and idle tracking watch this container only.</small>
+                      </div>
+                      <div class="ondemand-field">
+                          <label for="stack-startup-delay" class="field-label">Startup Delay</label>
+                          <div class="input-suffix-wrap">
+                              <input type="number" id="stack-startup-delay" class="form-input" value="0" min="0">
+                              <span class="input-suffix">seconds</span>
+                          </div>
+                          <small>Redirect after this many seconds · 0 = TCP probe only</small>
+                      </div>
+                      <div class="ondemand-field">
+                          <label for="stack-idle-timeout" class="field-label">Idle Timeout</label>
+                          <div class="input-suffix-wrap">
+                              <input type="number" id="stack-idle-timeout" class="form-input" value="0" min="0">
+                              <span class="input-suffix">seconds</span>
+                          </div>
+                          <small>Auto-stop after inactivity · 0 = disabled</small>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
 
-    <button type="submit" class="btn-primary">Create Stack Schedule</button>
-</div>
-</form>
-</div>
+      <label class="check-label">
+          <input type="checkbox" id="stack-enabled" checked>
+          <span>Enabled</span>
+      </label>
+
+      <button type="submit" class="btn-primary">Create Stack Schedule</button>
+      <button type="button" class="btn-ghost" onclick="document.getElementById('schedule-dialog').close()">Cancel</button>
+  </div>
+  </form>
+  </div>
+</dialog>
 
 <h2>All Schedules</h2>
 <table class="data-table">
@@ -223,6 +229,10 @@
 <script>
 var allContainers = [];
 var currentMode = '{{if eq .Mode "stack"}}stack{{else}}container{{end}}';
+
+if (currentMode === 'stack') {
+    document.getElementById('schedule-dialog').showModal();
+}
 
 function switchMode(mode) {
     currentMode = mode;
