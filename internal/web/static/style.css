@@ -662,3 +662,36 @@ small { color: var(--text-secondary); }
     cursor: pointer;
     margin: 0;
 }
+
+.mode-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+.mode-toggle-btn {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    border: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+}
+.mode-toggle-btn.active {
+    background: var(--accent);
+    color: #fff;
+}
+.mode-toggle-btn:hover:not(.active) {
+    background: var(--bg-hover);
+}
+.mode-fields {
+    display: none;
+}
+.mode-fields.active {
+    display: block;
+}
