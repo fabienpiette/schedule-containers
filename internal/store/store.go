@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/gndm/schedule-containers/internal/models"
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
+
+	"github.com/gndm/schedule-containers/internal/models"
 )
 
 type Store struct {
@@ -136,6 +138,7 @@ func (s *Store) CreateSchedule(ctx context.Context, schedule *models.Schedule) (
 	schedule.ID = uuid.New().String()
 	schedule.CreatedAt = now
 	schedule.UpdatedAt = now
+	slog.Info("store: creating schedule", "id", schedule.ID, "container", schedule.ContainerName, "stack_name", schedule.StackName, "tag_id", schedule.TagID, "start_cron", schedule.StartCron, "stop_cron", schedule.StopCron, "on_demand_enabled", schedule.OnDemandEnabled)
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO schedules (id, container_name, display_name, stack_name, start_cron, stop_cron, enabled, on_demand_enabled, on_demand_url, idle_timeout_sec, startup_delay_sec, tag_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

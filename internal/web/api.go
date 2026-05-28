@@ -110,6 +110,7 @@ func (s *Server) apiCreateSchedule(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	slog.Info("creating schedule", "container", req.ContainerName, "stack_name", req.StackName, "tag_id", req.TagID, "on_demand_enabled", req.OnDemandEnabled, "start_cron", req.StartCron, "stop_cron", req.StopCron)
 	created, err := s.store.CreateSchedule(r.Context(), &req)
 	if err != nil {
 		slog.Error("failed to create schedule", "error", err)
@@ -749,6 +750,7 @@ func (s *Server) apiApplyTagToContainers(w http.ResponseWriter, r *http.Request)
 			OnDemandURL:     "",
 			IdleTimeoutSec:  0,
 		}
+		slog.Info("creating tag-derived schedule", "container", containerName, "tag_id", tagID, "tag_name", tag.Name)
 		createdSched, err := s.store.CreateSchedule(r.Context(), sched)
 		if err != nil {
 			slog.Error("failed to create schedule for container", "container", containerName, "error", err)
@@ -917,6 +919,7 @@ func (s *Server) apiCreateStack(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	slog.Info("creating stack", "name", req.Name, "on_demand_enabled", req.OnDemandEnabled, "start_cron", req.StartCron, "stop_cron", req.StopCron, "primary_container", req.PrimaryContainer)
 	created, err := s.store.CreateStack(r.Context(), &req)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
