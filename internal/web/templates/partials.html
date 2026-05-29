@@ -42,17 +42,14 @@
 {{end}}
 
 {{define "schedule-tbody"}}
-<tbody id="schedule-tbody">
 {{range .Schedules}}
 {{template "schedule-row" .}}
 {{else}}
 <tr><td colspan="7" class="muted">No schedules configured</td></tr>
 {{end}}
-</tbody>
 {{end}}
 
 {{define "tag-tbody"}}
-<tbody id="tag-tbody">
 {{range .Tags}}
 {{template "tag-row" .}}
 <tr id="tag-{{.ID}}-detail" class="tag-detail-row" style="display:none;">
@@ -83,17 +80,14 @@
 {{else}}
 <tr><td colspan="6" class="muted">No tags configured. Create one to get started.</td></tr>
 {{end}}
-</tbody>
 {{end}}
 
 {{define "container-tbody"}}
-<tbody id="container-tbody">
 {{range .Containers}}
 {{template "container-row" .}}
 {{else}}
 <tr><td colspan="6" class="muted">No containers found</td></tr>
 {{end}}
-</tbody>
 {{end}}
 
 {{define "stack-row"}}
@@ -114,11 +108,9 @@
 {{end}}
 
 {{define "stack-tbody"}}
-<tbody id="stack-tbody">
 {{range .Stacks}}
 {{template "stack-row" .}}
 {{else}}
 <tr><td colspan="8" class="muted">No stack schedules configured</td></tr>
 {{end}}
-</tbody>
 {{end}}
