@@ -9,7 +9,7 @@
     <td class="cell-actions">
         <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
         <button class="btn-ghost btn-sm" onclick="editSchedule('{{.ID}}')">Edit</button>
-        <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-table','refreshList')})})">Delete</button>
+        <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-tbody','refreshList')})})">Delete</button>
     </td>
 </tr>
 {{end}}
@@ -23,7 +23,7 @@
     <td>{{.ContainerCount}}</td>
     <td class="cell-actions">
         <button class="btn-ghost btn-sm" hx-post="/api/tags/{{.ID}}/toggle" hx-target="#tag-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-        <button class="btn-danger-text btn-sm" onclick="showConfirm('Delete Tag','Remove tag {{.Name}} and its schedules?',function(){htmx.ajax('DELETE','/api/tags/{{.ID}}').then(function(){htmx.trigger('#tag-table','refreshList')})})">Delete</button>
+        <button class="btn-danger-text btn-sm" onclick="showConfirm('Delete Tag','Remove tag {{.Name}} and its schedules?',function(){htmx.ajax('DELETE','/api/tags/{{.ID}}').then(function(){htmx.trigger('#tag-tbody','refreshList')})})">Delete</button>
     </td>
 </tr>
 {{end}}
@@ -34,7 +34,7 @@
     <td class="muted">{{.Image}}</td>
     <td>{{if eq .State "running"}}<span class="badge badge-success">Running</span>{{else}}<span class="badge badge-danger">{{.State}}</span>{{end}}</td>
     <td class="muted">{{.StackName}}</td>
-    <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}<button class="btn-remove-tag" onclick="htmx.ajax('DELETE','/api/tags/{{.TagID}}/containers/{{.Name}}').then(function(){htmx.trigger('#container-table','refreshList')})" title="Remove tag">&times;</button></span>{{else}}<span class="muted">-</span>{{end}}</td>
+    <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}<button class="btn-remove-tag" onclick="htmx.ajax('DELETE','/api/tags/{{.TagID}}/containers/{{.Name}}').then(function(){htmx.trigger('#container-tbody','refreshList')})" title="Remove tag">&times;</button></span>{{else}}<span class="muted">-</span>{{end}}</td>
     <td class="cell-actions">
         {{if eq .State "running"}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Stop</button>{{else}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Start</button>{{end}}
     </td>
@@ -102,7 +102,7 @@
     <td class="cell-actions">
         <button class="btn-ghost btn-sm" hx-post="/api/stacks/{{.ID}}/toggle" hx-target="#stack-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
         <button class="btn-ghost btn-sm" onclick="editStack('{{.ID}}')">Edit</button>
-        <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-table','refreshList')})})">Delete</button>
+        <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-tbody','refreshList')})})">Delete</button>
     </td>
 </tr>
 {{end}}

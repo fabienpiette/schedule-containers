@@ -47,7 +47,7 @@
             <th>Actions</th>
         </tr>
     </thead>
-    <tbody id="tag-tbody" hx-get="/api/tags" hx-trigger="refreshList from:#tag-table" hx-target="#tag-tbody" hx-swap="innerHTML">
+    <tbody id="tag-tbody" hx-get="/api/tags" hx-trigger="refreshList" hx-swap="innerHTML">
         {{range .Tags}}
         <tr class="data-row" id="tag-{{.ID}}">
             <td class="cell-name">{{.Name}}</td>
@@ -59,7 +59,7 @@
             </td>
             <td class="cell-actions">
                 <button class="btn-ghost btn-sm" hx-post="/api/tags/{{.ID}}/toggle" hx-target="#tag-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Tag','Delete tag \'{{.Name}}\' and all its schedules?',function(){htmx.ajax('DELETE','/api/tags/{{.ID}}').then(function(){htmx.trigger('#tag-table','refreshList')})})">Delete</button>
+                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Tag','Delete tag \'{{.Name}}\' and all its schedules?',function(){htmx.ajax('DELETE','/api/tags/{{.ID}}').then(function(){htmx.trigger('#tag-tbody','refreshList')})})">Delete</button>
             </td>
         </tr>
         <tr id="tag-{{.ID}}-detail" class="tag-detail-row" style="display:none;">
@@ -149,7 +149,7 @@ document.getElementById('tag-form').addEventListener('submit', function(e) {
         if (r.ok) {
             showToast('Tag created');
             document.getElementById('tag-dialog').close();
-            htmx.trigger('#tag-table', 'refreshList');
+            htmx.trigger('#tag-tbody', 'refreshList');
         } else {
             return r.text().then(function(t) { throw new Error(t); });
         }
@@ -182,7 +182,7 @@ function applyTagToContainers(tagId) {
                 var created = data.created ? data.created.length : 0;
                 var skipped = data.skipped ? data.skipped.length : 0;
                 showToast('Applied: ' + created + ' created, ' + skipped + ' skipped');
-                htmx.trigger('#tag-table', 'refreshList');
+                htmx.trigger('#tag-tbody', 'refreshList');
             });
         } else {
             return r.text().then(function(t) { throw new Error(t); });

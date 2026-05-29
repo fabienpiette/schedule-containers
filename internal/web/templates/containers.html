@@ -15,7 +15,7 @@
             <th>Actions</th>
         </tr>
     </thead>
-    <tbody id="container-tbody" hx-get="/api/containers" hx-trigger="refreshList from:#container-table" hx-target="#container-tbody" hx-swap="innerHTML">
+    <tbody id="container-tbody" hx-get="/api/containers" hx-trigger="refreshList" hx-swap="innerHTML">
         {{range .Containers}}
         <tr class="data-row" id="container-{{.Name}}">
             <td class="cell-name">{{.Name}}</td>
@@ -66,7 +66,7 @@ function assignTag(event, containerName) {
         body: JSON.stringify({containers: [containerName]})
     }).then(function(r) {
         if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-        htmx.trigger('#container-table', 'refreshList');
+        htmx.trigger('#container-tbody', 'refreshList');
     }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
 }
 setupTable('container-table','container-search');

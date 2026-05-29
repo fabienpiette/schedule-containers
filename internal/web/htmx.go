@@ -7,6 +7,9 @@ import (
 )
 
 func wantsHTML(r *http.Request) bool {
+	if r.Header.Get("HX-Request") == "true" {
+		return true
+	}
 	return strings.Contains(r.Header.Get("Accept"), "text/html")
 }
 

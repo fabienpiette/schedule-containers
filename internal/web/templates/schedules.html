@@ -202,7 +202,7 @@
             <th>Actions</th>
         </tr>
     </thead>
-    <tbody id="schedule-tbody" hx-get="/api/schedules" hx-trigger="refreshList from:#schedule-table" hx-target="#schedule-tbody" hx-swap="innerHTML">
+    <tbody id="schedule-tbody" hx-get="/api/schedules" hx-trigger="refreshList" hx-swap="innerHTML">
         {{range .Schedules}}
         <tr class="data-row" id="schedule-{{.ID}}">
             <td class="cell-name">{{.DisplayName}}</td>
@@ -214,7 +214,7 @@
             <td class="cell-actions">
                 <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
                 <button class="btn-ghost btn-sm" onclick="editSchedule('{{.ID}}')">Edit</button>
-                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-table','refreshList')})})">Delete</button>
+                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-tbody','refreshList')})})">Delete</button>
             </td>
         </tr>
         {{else}}
@@ -238,7 +238,7 @@
             <th>Actions</th>
         </tr>
     </thead>
-    <tbody id="stack-tbody" hx-get="/api/stacks" hx-trigger="refreshList from:#stack-table" hx-target="#stack-tbody" hx-swap="innerHTML">
+    <tbody id="stack-tbody" hx-get="/api/stacks" hx-trigger="refreshList" hx-swap="innerHTML">
         {{range .Stacks}}
         <tr class="data-row" id="stack-{{.ID}}">
             <td class="cell-name">{{.Name}}</td>
@@ -251,7 +251,7 @@
             <td class="cell-actions">
                 <button class="btn-ghost btn-sm" hx-post="/api/stacks/{{.ID}}/toggle" hx-target="#stack-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
                 <button class="btn-ghost btn-sm" onclick="editStack('{{.ID}}')">Edit</button>
-                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-table','refreshList')})})">Delete</button>
+                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-tbody','refreshList')})})">Delete</button>
             </td>
         </tr>
         {{else}}
@@ -597,7 +597,7 @@ document.getElementById('schedule-form').addEventListener('submit', function(e) 
             editingScheduleId = null;
             document.getElementById('schedule-submit-btn').textContent = 'Create Schedule';
             document.getElementById('schedule-dialog').close();
-            htmx.trigger('#schedule-table', 'refreshList');
+            htmx.trigger('#schedule-tbody', 'refreshList');
         } else {
             return r.text().then(function(t) { throw new Error(t); });
         }
@@ -635,7 +635,7 @@ document.getElementById('stack-form').addEventListener('submit', function(e) {
             editingStackId = null;
             document.getElementById('stack-submit-btn').textContent = 'Create Stack Schedule';
             document.getElementById('schedule-dialog').close();
-            htmx.trigger('#stack-table', 'refreshList');
+            htmx.trigger('#stack-tbody', 'refreshList');
         } else {
             return r.text().then(function(t) { throw new Error(t); });
         }
