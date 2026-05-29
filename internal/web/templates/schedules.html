@@ -89,8 +89,8 @@
           <span>Enabled</span>
       </label>
 
-      <button type="submit" class="btn-primary">Create Schedule</button>
-      <button type="button" class="btn-ghost" onclick="document.getElementById('schedule-dialog').close()">Cancel</button>
+      <button type="submit" class="btn-primary" id="schedule-submit-btn">Create Schedule</button>
+      <button type="button" class="btn-ghost" onclick="cancelScheduleDialog()">Cancel</button>
   </div>
   </form>
   </div>
@@ -181,8 +181,8 @@
           <span>Enabled</span>
       </label>
 
-      <button type="submit" class="btn-primary">Create Stack Schedule</button>
-      <button type="button" class="btn-ghost" onclick="document.getElementById('schedule-dialog').close()">Cancel</button>
+      <button type="submit" class="btn-primary" id="stack-submit-btn">Create Stack Schedule</button>
+      <button type="button" class="btn-ghost" onclick="cancelScheduleDialog()">Cancel</button>
   </div>
   </form>
   </div>
@@ -213,6 +213,7 @@
             <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
             <td class="cell-actions">
                 <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+                <button class="btn-ghost btn-sm" onclick="editSchedule('{{.ID}}')">Edit</button>
                 <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-table','refreshList')})})">Delete</button>
             </td>
         </tr>
@@ -249,6 +250,7 @@
             <td>{{.ContainerCount}} containers</td>
             <td class="cell-actions">
                 <button class="btn-ghost btn-sm" hx-post="/api/stacks/{{.ID}}/toggle" hx-target="#stack-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+                <button class="btn-ghost btn-sm" onclick="editStack('{{.ID}}')">Edit</button>
                 <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-table','refreshList')})})">Delete</button>
             </td>
         </tr>
@@ -482,6 +484,88 @@ document.getElementById('stack-on-demand').addEventListener('change', function()
     }
 });
 
+var editingScheduleId = null;
+var editingStackId = null;
+
+function cancelScheduleDialog() {
+    editingScheduleId = null;
+    editingStackId = null;
+    document.getElementById('schedule-submit-btn').textContent = 'Create Schedule';
+    document.getElementById('stack-submit-btn').textContent = 'Create Stack Schedule';
+    document.getElementById('schedule-dialog').close();
+}
+
+function editSchedule(id) {
+    fetch('/api/schedules').then(function(r) { return r.json(); }).then(function(schedules) {
+        var s = schedules.find(function(x) { return x.id === id; });
+        if (!s) return;
+        editingScheduleId = id;
+        editingStackId = null;
+        switchMode('container');
+        clearContainerFields();
+        document.getElementById('schedule-submit-btn').textContent = 'Update Schedule';
+        var sel = document.getElementById('container_name');
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === s.container_name) { sel.selectedIndex = i; break; }
+        }
+        document.getElementById('display_name').value = s.display_name || '';
+        document.getElementById('start_cron').value = s.start_cron || '';
+        document.getElementById('stop_cron').value = s.stop_cron || '';
+        document.getElementById('on_demand_enabled').checked = s.on_demand_enabled;
+        document.getElementById('on_demand_url').value = s.on_demand_url || '';
+        document.getElementById('startup_delay_sec').value = s.startup_delay_sec || 0;
+        document.getElementById('idle_timeout_sec').value = s.idle_timeout_sec || 0;
+        document.getElementById('enabled').checked = s.enabled;
+        if (s.on_demand_enabled) {
+            document.getElementById('ondemand-fields').classList.add('expanded');
+            document.getElementById('ondemand-panel').classList.add('is-enabled');
+            document.getElementById('start_cron').removeAttribute('required');
+            document.getElementById('stop_cron').removeAttribute('required');
+            document.getElementById('start-cron-hint').textContent = 'Optional when wake-on-access is enabled.';
+            document.getElementById('stop-cron-hint').textContent = 'Optional when wake-on-access is enabled.';
+        }
+        document.getElementById('schedule-dialog').showModal();
+    });
+}
+
+function editStack(id) {
+    fetch('/api/stacks').then(function(r) { return r.json(); }).then(function(stacks) {
+        var s = stacks.find(function(x) { return x.id === id; });
+        if (!s) return;
+        editingStackId = id;
+        editingScheduleId = null;
+        switchMode('stack');
+        clearStackFields();
+        document.getElementById('stack-submit-btn').textContent = 'Update Stack Schedule';
+        var sel = document.getElementById('stack-name');
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === s.name) { sel.selectedIndex = i; break; }
+        }
+        document.getElementById('stack-display-name').value = s.display_name || '';
+        document.getElementById('stack-start-cron').value = s.start_cron || '';
+        document.getElementById('stack-stop-cron').value = s.stop_cron || '';
+        document.getElementById('stack-on-demand').checked = s.on_demand_enabled;
+        document.getElementById('stack-on-demand-url').value = s.on_demand_url || '';
+        document.getElementById('stack-startup-delay').value = s.startup_delay_sec || 0;
+        document.getElementById('stack-idle-timeout').value = s.idle_timeout_sec || 0;
+        document.getElementById('stack-enabled').checked = s.enabled;
+        if (s.on_demand_enabled) {
+            document.getElementById('stack-ondemand-fields').classList.add('expanded');
+            document.getElementById('stack-ondemand-panel').classList.add('is-enabled');
+            sel.dispatchEvent(new Event('change'));
+            setTimeout(function() {
+                var pc = document.getElementById('stack-primary-container');
+                if (s.primary_container) {
+                    for (var j = 0; j < pc.options.length; j++) {
+                        if (pc.options[j].value === s.primary_container) { pc.selectedIndex = j; break; }
+                    }
+                }
+            }, 100);
+        }
+        document.getElementById('schedule-dialog').showModal();
+    });
+}
+
 // Container mode: submit
 document.getElementById('schedule-form').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -497,13 +581,21 @@ document.getElementById('schedule-form').addEventListener('submit', function(e) 
         startup_delay_sec: parseInt(form.startup_delay_sec.value) || 0,
         idle_timeout_sec: parseInt(form.idle_timeout_sec.value) || 0
     };
-    fetch('/api/schedules', {
-        method: 'POST',
+    var url = '/api/schedules';
+    var method = 'POST';
+    if (editingScheduleId) {
+        url = '/api/schedules/' + editingScheduleId;
+        method = 'PUT';
+    }
+    fetch(url, {
+        method: method,
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     }).then(function(r) {
         if (r.ok) {
-            showToast('Schedule created');
+            showToast(editingScheduleId ? 'Schedule updated' : 'Schedule created');
+            editingScheduleId = null;
+            document.getElementById('schedule-submit-btn').textContent = 'Create Schedule';
             document.getElementById('schedule-dialog').close();
             htmx.trigger('#schedule-table', 'refreshList');
         } else {
@@ -527,13 +619,21 @@ document.getElementById('stack-form').addEventListener('submit', function(e) {
         idle_timeout_sec: parseInt(document.getElementById('stack-idle-timeout').value) || 0,
         startup_delay_sec: parseInt(document.getElementById('stack-startup-delay').value) || 0
     };
-    fetch('/api/stacks', {
-        method: 'POST',
+    var url = '/api/stacks';
+    var method = 'POST';
+    if (editingStackId) {
+        url = '/api/stacks/' + editingStackId;
+        method = 'PUT';
+    }
+    fetch(url, {
+        method: method,
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     }).then(function(r) {
         if (r.ok) {
-            showToast('Stack schedule created');
+            showToast(editingStackId ? 'Stack schedule updated' : 'Stack schedule created');
+            editingStackId = null;
+            document.getElementById('stack-submit-btn').textContent = 'Create Stack Schedule';
             document.getElementById('schedule-dialog').close();
             htmx.trigger('#stack-table', 'refreshList');
         } else {

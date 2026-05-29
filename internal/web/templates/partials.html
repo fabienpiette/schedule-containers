@@ -8,6 +8,7 @@
     <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
     <td class="cell-actions">
         <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+        <button class="btn-ghost btn-sm" onclick="editSchedule('{{.ID}}')">Edit</button>
         <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-table','refreshList')})})">Delete</button>
     </td>
 </tr>
@@ -106,6 +107,7 @@
     <td>{{.ContainerCount}} containers</td>
     <td class="cell-actions">
         <button class="btn-ghost btn-sm" hx-post="/api/stacks/{{.ID}}/toggle" hx-target="#stack-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+        <button class="btn-ghost btn-sm" onclick="editStack('{{.ID}}')">Edit</button>
         <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-table','refreshList')})})">Delete</button>
     </td>
 </tr>
