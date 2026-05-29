@@ -1,12 +1,14 @@
 package web
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -39,7 +41,9 @@ func (s *Server) apiListContainers(w http.ResponseWriter, r *http.Request) {
 		for i, t := range tags {
 			tagOptions[i] = TagOption{ID: t.ID, Name: t.Name}
 		}
+		slices.SortFunc(tagOptions, func(a, b TagOption) int { return cmp.Compare(a.Name, b.Name) })
 		views := buildContainerViews(containers, schedules, tagCache, stackNameSet)
+		slices.SortFunc(views, func(a, b ContainerView) int { return cmp.Compare(a.Name, b.Name) })
 		w.Header().Set("Content-Type", "text/html")
 		s.renderPartial(w, "container-tbody", ContainersData{
 			Containers: views,
@@ -65,9 +69,11 @@ func (s *Server) apiListSchedules(w http.ResponseWriter, r *http.Request) {
 		stacks, _ := s.store.ListStacks(r.Context())
 		tagCache := buildTagCache(tags)
 		stackNameSet := buildStackNameSet(stacks)
+		scheduleViews := buildScheduleViews(schedules, tagCache, stackNameSet)
+		slices.SortFunc(scheduleViews, func(a, b ScheduleView) int { return cmp.Compare(a.DisplayName, b.DisplayName) })
 		w.Header().Set("Content-Type", "text/html")
 		s.renderPartial(w, "schedule-tbody", SchedulesData{
-			Schedules: buildScheduleViews(schedules, tagCache, stackNameSet),
+			Schedules: scheduleViews,
 		})
 		return
 	}
@@ -554,6 +560,7 @@ func (s *Server) apiListTags(w http.ResponseWriter, r *http.Request) {
 			for j, sched := range schedules {
 				tagContainers[j] = sched.ContainerName
 			}
+			slices.Sort(tagContainers)
 			tagViews[i] = TagView{
 				ID:             tag.ID,
 				Name:           tag.Name,
@@ -564,6 +571,7 @@ func (s *Server) apiListTags(w http.ResponseWriter, r *http.Request) {
 				Containers:     tagContainers,
 			}
 		}
+		slices.SortFunc(tagViews, func(a, b TagView) int { return cmp.Compare(a.Name, b.Name) })
 		w.Header().Set("Content-Type", "text/html")
 		s.renderPartial(w, "tag-tbody", TagsData{
 			Tags:            tagViews,
@@ -960,6 +968,7 @@ func (s *Server) apiListStacks(w http.ResponseWriter, r *http.Request) {
 				ContainerCount: countByStack[st.Name],
 			}
 		}
+		slices.SortFunc(stackViews, func(a, b StackView) int { return cmp.Compare(a.Name, b.Name) })
 		w.Header().Set("Content-Type", "text/html")
 		s.renderPartial(w, "stack-tbody", SchedulesData{Stacks: stackViews})
 		return

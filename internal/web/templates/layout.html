@@ -133,6 +133,38 @@
                 });
             }
         }
+        function sortSelectOptions(selectEl){
+            if(!selectEl)return;
+            var placeholder=[];
+            var groups={};
+            var loose=[];
+            Array.from(selectEl.children).forEach(function(child){
+                if(child.tagName==='OPTGROUP'){
+                    var label=child.label||child.getAttribute('label')||'';
+                    if(!groups[label])groups[label]=[];
+                    var opts=Array.from(child.children);
+                    opts.sort(function(a,b){return(a.textContent||'').localeCompare(b.textContent||'');});
+                    groups[label]=groups[label].concat(opts);
+                }else if(child.tagName==='OPTION'){
+                    if(!child.value||child.disabled){
+                        placeholder.push(child);
+                    }else{
+                        loose.push(child);
+                    }
+                }
+            });
+            loose.sort(function(a,b){return(a.textContent||'').localeCompare(b.textContent||'');});
+            selectEl.innerHTML='';
+            placeholder.forEach(function(opt){selectEl.appendChild(opt);});
+            var sortedGroups=Object.keys(groups).sort();
+            sortedGroups.forEach(function(label){
+                var group=document.createElement('optgroup');
+                group.label=label;
+                groups[label].forEach(function(opt){group.appendChild(opt);});
+                selectEl.appendChild(group);
+            });
+            loose.forEach(function(opt){selectEl.appendChild(opt);});
+        }
         document.body.addEventListener('htmx:afterRequest',function(evt){
             if(evt.detail&&evt.detail.xhr){
                 var msg=evt.detail.xhr.getResponseHeader('X-Toast-Message');

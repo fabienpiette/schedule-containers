@@ -15,12 +15,9 @@
   <form id="schedule-form">
   <div class="form-group">
       <label for="container_name">Container</label>
-      <select name="container_name" id="container_name" class="form-select" required>
-          <option value="">Select a container...</option>
-          {{range .Containers}}
-          <option value="{{.Name}}">{{.Name}}</option>
-          {{end}}
-      </select>
+<select name="container_name" id="container_name" class="form-select" required>
+            <option value="">Select a container...</option>
+        </select>
 
       <label for="display_name">Display Name</label>
       <input type="text" name="display_name" id="display_name" class="form-input">
@@ -267,6 +264,20 @@
 var allContainers = [];
 var currentMode = '{{if eq .Mode "stack"}}stack{{else}}container{{end}}';
 
+fetch('/api/containers').then(function(r){return r.json();}).then(function(containers){
+    allContainers=containers;
+    var sel=document.getElementById('container_name');
+    if(sel){
+        containers.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(c){
+            var opt=document.createElement('option');
+            opt.value=c.name;
+            opt.textContent=c.name;
+            sel.appendChild(opt);
+        });
+        sortSelectOptions(sel);
+    }
+});
+
 if (currentMode === 'stack') {
     document.getElementById('schedule-dialog').showModal();
 }
@@ -368,10 +379,10 @@ fetch('/api/presets')
         ['start_preset', 'stop_preset', 'stack-start-preset', 'stack-stop-preset'].forEach(function(selId) {
             var sel = document.getElementById(selId);
             if (!sel) return;
-            Object.keys(categories).forEach(function(cat) {
+            Object.keys(categories).sort().forEach(function(cat) {
                 var group = document.createElement('optgroup');
                 group.label = cat;
-                categories[cat].forEach(function(p) {
+                categories[cat].sort(function(a,b){return a.label.localeCompare(b.label);}).forEach(function(p) {
                     var opt = document.createElement('option');
                     opt.value = p.expression;
                     opt.textContent = p.label;
@@ -379,6 +390,7 @@ fetch('/api/presets')
                 });
                 if (group.children.length > 0) sel.appendChild(group);
             });
+            sortSelectOptions(sel);
         });
     });
 
@@ -414,14 +426,12 @@ document.getElementById('stack-name').addEventListener('change', function() {
     var primarySelect = document.getElementById('stack-primary-container');
     primarySelect.innerHTML = '<option value="">-- Select primary container --</option>';
     if (selectedStack) {
-        allContainers.forEach(function(c) {
-            if (c.stack_name === selectedStack) {
+        allContainers.filter(function(c){ return c.stack_name === selectedStack; }).sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(c) {
                 var opt = document.createElement('option');
                 opt.value = c.name;
                 opt.textContent = c.name;
                 primarySelect.appendChild(opt);
-            }
-        });
+            });
     }
 });
 

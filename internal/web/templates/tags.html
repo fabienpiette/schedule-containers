@@ -118,10 +118,10 @@ fetch('/api/presets')
         });
         ['start_preset', 'stop_preset'].forEach(function(selId) {
             var sel = document.getElementById(selId);
-            Object.keys(categories).forEach(function(cat) {
+            Object.keys(categories).sort().forEach(function(cat) {
                 var group = document.createElement('optgroup');
                 group.label = cat;
-                categories[cat].forEach(function(p) {
+                categories[cat].sort(function(a,b){return a.label.localeCompare(b.label);}).forEach(function(p) {
                     var opt = document.createElement('option');
                     opt.value = p.expression;
                     opt.textContent = p.label;

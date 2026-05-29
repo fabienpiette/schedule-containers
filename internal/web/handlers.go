@@ -1,12 +1,14 @@
 package web
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/go-chi/chi/v5"
 
@@ -291,10 +293,14 @@ func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 	for i, t := range tags {
 		tagOptions[i] = TagOption{ID: t.ID, Name: t.Name}
 	}
+	slices.SortFunc(tagOptions, func(a, b TagOption) int { return cmp.Compare(a.Name, b.Name) })
+
+	views := buildContainerViews(containers, schedules, tagCache, stackNameSet)
+	slices.SortFunc(views, func(a, b ContainerView) int { return cmp.Compare(a.Name, b.Name) })
 
 	s.renderPage(w, "containers.html", ContainersData{
 		Title:      "Containers",
-		Containers: buildContainerViews(containers, schedules, tagCache, stackNameSet),
+		Containers: views,
 		Tags:       tagOptions,
 	})
 }
@@ -311,6 +317,7 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 	for i, c := range containers {
 		containerViews[i] = ContainerView{ID: c.ID, Name: c.Name}
 	}
+	slices.SortFunc(containerViews, func(a, b ContainerView) int { return cmp.Compare(a.Name, b.Name) })
 
 	countByStack := make(map[string]int)
 	for _, c := range containers {
@@ -325,13 +332,17 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 			ContainerCount: countByStack[st.Name],
 		}
 	}
+	slices.SortFunc(stackViews, func(a, b StackView) int { return cmp.Compare(a.Name, b.Name) })
 
 	mode := r.URL.Query().Get("mode")
+
+	scheduleViews := buildScheduleViews(schedules, tagCache, stackNameSet)
+	slices.SortFunc(scheduleViews, func(a, b ScheduleView) int { return cmp.Compare(a.DisplayName, b.DisplayName) })
 
 	s.renderPage(w, "schedules.html", SchedulesData{
 		Title:      "Schedules",
 		Containers: containerViews,
-		Schedules:  buildScheduleViews(schedules, tagCache, stackNameSet),
+		Schedules:  scheduleViews,
 		Stacks:     stackViews,
 		Mode:       mode,
 	})
@@ -365,6 +376,7 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 		containerNames[i] = c.Name
 		containerStates[c.Name] = c.State
 	}
+	slices.Sort(containerNames)
 
 	tagViews := make([]TagView, len(tags))
 	for i, tag := range tags {
@@ -373,6 +385,7 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 		for j, sched := range schedules {
 			tagContainers[j] = sched.ContainerName
 		}
+		slices.Sort(tagContainers)
 		tagViews[i] = TagView{
 			ID:             tag.ID,
 			Name:           tag.Name,
@@ -383,6 +396,8 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 			Containers:     tagContainers,
 		}
 	}
+
+	slices.SortFunc(tagViews, func(a, b TagView) int { return cmp.Compare(a.Name, b.Name) })
 
 	s.renderPage(w, "tags.html", TagsData{
 		Title:           "Tags",
