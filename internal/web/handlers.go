@@ -91,11 +91,14 @@ type ContainersData struct {
 }
 
 type SchedulesData struct {
-	Title      string
-	Containers []ContainerView
-	Schedules  []ScheduleView
-	Stacks     []StackView
-	Mode       string
+	Title          string
+	Containers     []ContainerView
+	Schedules      []ScheduleView
+	Stacks         []StackView
+	Mode           string
+	RunningCount   int
+	StoppedCount   int
+	SchedulesCount int
 }
 
 type PresetsData struct {
@@ -334,17 +337,35 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 	}
 	slices.SortFunc(stackViews, func(a, b StackView) int { return cmp.Compare(a.Name, b.Name) })
 
+	scheduledNames := make(map[string]bool, len(schedules))
+	for _, sched := range schedules {
+		scheduledNames[sched.ContainerName] = true
+	}
+	runningCount, stoppedCount := 0, 0
+	for _, c := range containers {
+		if scheduledNames[c.Name] {
+			if c.State == "running" {
+				runningCount++
+			} else {
+				stoppedCount++
+			}
+		}
+	}
+
 	mode := r.URL.Query().Get("mode")
 
 	scheduleViews := buildScheduleViews(schedules, tagCache, stackNameSet)
 	slices.SortFunc(scheduleViews, func(a, b ScheduleView) int { return cmp.Compare(a.DisplayName, b.DisplayName) })
 
 	s.renderPage(w, "schedules.html", SchedulesData{
-		Title:      "Schedules",
-		Containers: containerViews,
-		Schedules:  scheduleViews,
-		Stacks:     stackViews,
-		Mode:       mode,
+		Title:          "Schedules",
+		Containers:     containerViews,
+		Schedules:      scheduleViews,
+		Stacks:         stackViews,
+		Mode:           mode,
+		RunningCount:   runningCount,
+		StoppedCount:   stoppedCount,
+		SchedulesCount: len(schedules) + len(stacks),
 	})
 }
 
