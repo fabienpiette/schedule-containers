@@ -16,16 +16,7 @@ import (
 	"github.com/gndm/schedule-containers/internal/ondemand"
 )
 
-type DashboardData struct {
-	Title          string
-	Schedules      []ScheduleView
-	Containers     []ContainerView
-	Tags           []TagView
-	RunningCount   int
-	StoppedCount   int
-	SchedulesCount int
-	TagsCount      int
-}
+
 
 type ScheduleView struct {
 	ID               string
@@ -232,57 +223,7 @@ func (s *Server) buildSingleContainerView(ctx context.Context, ctr *models.Conta
 	}
 }
 
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	schedules, _ := s.store.ListSchedules(r.Context())
-	containers, _ := s.docker.ListContainers(r.Context())
-	tags, _ := s.store.ListTags(r.Context())
-	stacks, _ := s.store.ListStacks(r.Context())
 
-	tagCache := buildTagCache(tags)
-	stackNameSet := buildStackNameSet(stacks)
-	tagViews := make([]TagView, len(tags))
-	for i, tag := range tags {
-		tagViews[i] = TagView{
-			ID:        tag.ID,
-			Name:      tag.Name,
-			StartCron: tag.StartCron,
-			StopCron:  tag.StopCron,
-			Enabled:   tag.Enabled,
-		}
-	}
-
-	allContainers := buildContainerViews(containers, schedules, tagCache, stackNameSet)
-	scheduledNames := make(map[string]bool, len(schedules))
-	for _, sched := range schedules {
-		scheduledNames[sched.ContainerName] = true
-	}
-	scheduled := make([]ContainerView, 0, len(allContainers))
-	for _, cv := range allContainers {
-		if scheduledNames[cv.Name] {
-			scheduled = append(scheduled, cv)
-		}
-	}
-
-	runningCount, stoppedCount := 0, 0
-	for _, c := range scheduled {
-		if c.State == "running" {
-			runningCount++
-		} else {
-			stoppedCount++
-		}
-	}
-
-	s.renderPage(w, "dashboard.html", DashboardData{
-		Title:          "Dashboard",
-		Schedules:      buildScheduleViews(schedules, tagCache, stackNameSet),
-		Containers:     scheduled,
-		Tags:           tagViews,
-		RunningCount:   runningCount,
-		StoppedCount:   stoppedCount,
-		SchedulesCount: len(schedules),
-		TagsCount:      len(tags),
-	})
-}
 
 func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 	containers, _ := s.docker.ListContainers(r.Context())

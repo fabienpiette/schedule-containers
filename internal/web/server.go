@@ -71,7 +71,6 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		"templates/partials.html",
 	}
 	pages := map[string]string{
-		"dashboard.html":  "templates/dashboard.html",
 		"containers.html": "templates/containers.html",
 		"schedules.html":  "templates/schedules.html",
 		"presets.html":    "templates/presets.html",
@@ -103,7 +102,9 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 
 	staticContent, _ := fs.Sub(embeddedFS, "static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticContent))))
-	r.Get("/", srv.handleDashboard)
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/schedules", http.StatusMovedPermanently)
+	})
 	r.Get("/containers", srv.handleContainers)
 	r.Get("/schedules", srv.handleSchedulesNew)
 	r.Get("/presets", srv.handlePresets)
