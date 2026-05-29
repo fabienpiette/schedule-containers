@@ -15,7 +15,7 @@
             <th>Actions</th>
         </tr>
     </thead>
-    <tbody>
+    <tbody id="container-tbody" hx-get="/api/containers" hx-trigger="refreshList from:#container-table" hx-target="#container-tbody" hx-swap="innerHTML">
         {{range .Containers}}
         <tr class="data-row" id="container-{{.Name}}">
             <td class="cell-name">{{.Name}}</td>
@@ -62,14 +62,11 @@ function assignTag(event, containerName) {
     if (!tagId) { showToast('Select a tag first', 'error'); return; }
     fetch('/api/tags/' + tagId + '/containers', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json', 'Accept': 'text/html'},
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({containers: [containerName]})
     }).then(function(r) {
         if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-        return r.text();
-    }).then(function(html) {
-        var row = document.getElementById('container-' + containerName);
-        if (row) row.outerHTML = html;
+        htmx.trigger('#container-table', 'refreshList');
     }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
 }
 setupTable('container-table','container-search');

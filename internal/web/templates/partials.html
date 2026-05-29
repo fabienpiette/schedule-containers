@@ -1,14 +1,14 @@
 {{define "schedule-row"}}
 <tr class="data-row" id="schedule-{{.ID}}">
     <td class="cell-name">{{.DisplayName}}</td>
-    <td class="muted">{{.StackName}}</td>
+    <td class="muted">{{.StackName}}{{if .StackScheduleName}} <span class="badge badge-info" title="Managed by stack schedule">Stack: {{.StackScheduleName}}</span>{{end}}</td>
     <td><span class="cron">{{.StartCron}}</span> <span class="arrow">&rarr;</span> <span class="cron">{{.StopCron}}</span></td>
     <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}</span>{{else}}<span class="muted">-</span>{{end}}</td>
     <td>{{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{else}}<span class="muted">-</span>{{end}}</td>
     <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
     <td class="cell-actions">
         <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-        <button class="btn-danger-text btn-sm" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}',{target:'#schedule-{{.ID}}',swap:'outerHTML'})})">Delete</button>
+        <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-table','refreshList')})})">Delete</button>
     </td>
 </tr>
 {{end}}
@@ -22,7 +22,7 @@
     <td>{{.ContainerCount}}</td>
     <td class="cell-actions">
         <button class="btn-ghost btn-sm" hx-post="/api/tags/{{.ID}}/toggle" hx-target="#tag-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-        <button class="btn-danger-text btn-sm" onclick="showConfirm('Delete Tag','Remove tag {{.Name}} and its schedules?',function(){htmx.ajax('DELETE','/api/tags/{{.ID}}',{target:'#tag-{{.ID}}',swap:'outerHTML'})})">Delete</button>
+        <button class="btn-danger-text btn-sm" onclick="showConfirm('Delete Tag','Remove tag {{.Name}} and its schedules?',function(){htmx.ajax('DELETE','/api/tags/{{.ID}}').then(function(){htmx.trigger('#tag-table','refreshList')})})">Delete</button>
     </td>
 </tr>
 {{end}}
@@ -33,9 +33,90 @@
     <td class="muted">{{.Image}}</td>
     <td>{{if eq .State "running"}}<span class="badge badge-success">Running</span>{{else}}<span class="badge badge-danger">{{.State}}</span>{{end}}</td>
     <td class="muted">{{.StackName}}</td>
-    <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}<button class="btn-remove-tag" onclick="htmx.ajax('DELETE','/api/tags/{{.TagID}}/containers/{{.Name}}',{target:'#container-{{.Name}}',swap:'outerHTML'})">&times;</button></span>{{else}}<span class="muted">-</span>{{end}}</td>
+    <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}<button class="btn-remove-tag" onclick="htmx.ajax('DELETE','/api/tags/{{.TagID}}/containers/{{.Name}}').then(function(){htmx.trigger('#container-table','refreshList')})" title="Remove tag">&times;</button></span>{{else}}<span class="muted">-</span>{{end}}</td>
     <td class="cell-actions">
         {{if eq .State "running"}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/stop" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Stop</button>{{else}}<button class="btn-ghost btn-sm" hx-post="/api/containers/{{.Name}}/start" hx-target="#container-{{.Name}}" hx-swap="outerHTML">Start</button>{{end}}
     </td>
 </tr>
+{{end}}
+
+{{define "schedule-tbody"}}
+<tbody id="schedule-tbody">
+{{range .Schedules}}
+{{template "schedule-row" .}}
+{{else}}
+<tr><td colspan="7" class="muted">No schedules configured</td></tr>
+{{end}}
+</tbody>
+{{end}}
+
+{{define "tag-tbody"}}
+<tbody id="tag-tbody">
+{{range .Tags}}
+{{template "tag-row" .}}
+<tr id="tag-{{.ID}}-detail" class="tag-detail-row" style="display:none;">
+    <td colspan="6">
+        <div class="tag-detail">
+            <div class="tag-containers-list">
+                <strong>Containers:</strong>
+                {{if .Containers}}
+                    {{range $i, $c := .Containers}}<span class="badge badge-tag">{{$c}}</span>{{end}}
+                {{else}}
+                    <span class="muted">No containers assigned</span>
+                {{end}}
+            </div>
+            <div class="tag-apply">
+                <strong>Apply to containers:</strong>
+                <div class="apply-row">
+                    <select id="apply-select-{{.ID}}" multiple class="apply-multi-select">
+                        {{range $.Containers}}
+                        <option value="{{.}}">{{.}} ({{index $.ContainerStates .}})</option>
+                        {{end}}
+                    </select>
+                    <button class="btn-primary btn-sm" onclick="applyTagToContainers('{{.ID}}')">Apply</button>
+                </div>
+            </div>
+        </div>
+    </td>
+</tr>
+{{else}}
+<tr><td colspan="6" class="muted">No tags configured. Create one to get started.</td></tr>
+{{end}}
+</tbody>
+{{end}}
+
+{{define "container-tbody"}}
+<tbody id="container-tbody">
+{{range .Containers}}
+{{template "container-row" .}}
+{{else}}
+<tr><td colspan="6" class="muted">No containers found</td></tr>
+{{end}}
+</tbody>
+{{end}}
+
+{{define "stack-row"}}
+<tr class="data-row" id="stack-{{.ID}}">
+    <td class="cell-name">{{.Name}}</td>
+    <td>{{.DisplayName}}</td>
+    <td>{{if .StartCron}}<span class="cron">{{.StartCron}}</span>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
+    <td>{{if .StopCron}}<span class="cron">{{.StopCron}}</span>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
+    <td>{{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
+    <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
+    <td>{{.ContainerCount}} containers</td>
+    <td class="cell-actions">
+        <button class="btn-ghost btn-sm" hx-post="/api/stacks/{{.ID}}/toggle" hx-target="#stack-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+        <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-table','refreshList')})})">Delete</button>
+    </td>
+</tr>
+{{end}}
+
+{{define "stack-tbody"}}
+<tbody id="stack-tbody">
+{{range .Stacks}}
+{{template "stack-row" .}}
+{{else}}
+<tr><td colspan="8" class="muted">No stack schedules configured</td></tr>
+{{end}}
+</tbody>
 {{end}}

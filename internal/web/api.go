@@ -28,6 +28,26 @@ func (s *Server) apiListContainers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list containers", http.StatusInternalServerError)
 		return
 	}
+
+	if wantsHTML(r) {
+		schedules, _ := s.store.ListSchedules(r.Context())
+		tags, _ := s.store.ListTags(r.Context())
+		stacks, _ := s.store.ListStacks(r.Context())
+		tagCache := buildTagCache(tags)
+		stackNameSet := buildStackNameSet(stacks)
+		tagOptions := make([]TagOption, len(tags))
+		for i, t := range tags {
+			tagOptions[i] = TagOption{ID: t.ID, Name: t.Name}
+		}
+		views := buildContainerViews(containers, schedules, tagCache, stackNameSet)
+		w.Header().Set("Content-Type", "text/html")
+		s.renderPartial(w, "container-tbody", ContainersData{
+			Containers: views,
+			Tags:       tagOptions,
+		})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(containers)
 }
@@ -37,6 +57,18 @@ func (s *Server) apiListSchedules(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to list schedules", "error", err)
 		http.Error(w, "failed to list schedules", http.StatusInternalServerError)
+		return
+	}
+
+	if wantsHTML(r) {
+		tags, _ := s.store.ListTags(r.Context())
+		stacks, _ := s.store.ListStacks(r.Context())
+		tagCache := buildTagCache(tags)
+		stackNameSet := buildStackNameSet(stacks)
+		w.Header().Set("Content-Type", "text/html")
+		s.renderPartial(w, "schedule-tbody", SchedulesData{
+			Schedules: buildScheduleViews(schedules, tagCache, stackNameSet),
+		})
 		return
 	}
 
@@ -506,6 +538,41 @@ func (s *Server) apiListTags(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list tags", http.StatusInternalServerError)
 		return
 	}
+
+	if wantsHTML(r) {
+		containers, _ := s.docker.ListContainers(r.Context())
+		containerNames := make([]string, len(containers))
+		containerStates := make(map[string]string, len(containers))
+		for i, c := range containers {
+			containerNames[i] = c.Name
+			containerStates[c.Name] = c.State
+		}
+		tagViews := make([]TagView, len(tags))
+		for i, tag := range tags {
+			schedules, _ := s.store.ListSchedulesByTag(r.Context(), tag.ID)
+			tagContainers := make([]string, len(schedules))
+			for j, sched := range schedules {
+				tagContainers[j] = sched.ContainerName
+			}
+			tagViews[i] = TagView{
+				ID:             tag.ID,
+				Name:           tag.Name,
+				StartCron:      tag.StartCron,
+				StopCron:       tag.StopCron,
+				Enabled:        tag.Enabled,
+				ContainerCount: len(schedules),
+				Containers:     tagContainers,
+			}
+		}
+		w.Header().Set("Content-Type", "text/html")
+		s.renderPartial(w, "tag-tbody", TagsData{
+			Tags:            tagViews,
+			Containers:      containerNames,
+			ContainerStates: containerStates,
+		})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tags)
 }
@@ -877,6 +944,27 @@ func (s *Server) apiListStacks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list stacks", http.StatusInternalServerError)
 		return
 	}
+
+	if wantsHTML(r) {
+		containers, _ := s.docker.ListContainers(r.Context())
+		countByStack := make(map[string]int)
+		for _, c := range containers {
+			if c.StackName != "" {
+				countByStack[c.StackName]++
+			}
+		}
+		stackViews := make([]StackView, len(stacks))
+		for i, st := range stacks {
+			stackViews[i] = StackView{
+				Stack:          st,
+				ContainerCount: countByStack[st.Name],
+			}
+		}
+		w.Header().Set("Content-Type", "text/html")
+		s.renderPartial(w, "stack-tbody", SchedulesData{Stacks: stackViews})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stacks)
 }
