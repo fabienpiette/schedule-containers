@@ -421,8 +421,17 @@ fetch('/api/containers')
         });
     });
 
+document.getElementById('container_name').addEventListener('change', function() {
+    if (!document.getElementById('display_name').value && this.value) {
+        document.getElementById('display_name').value = this.options[this.selectedIndex].text;
+    }
+});
+
 document.getElementById('stack-name').addEventListener('change', function() {
     var selectedStack = this.value;
+    if (!document.getElementById('stack-display-name').value && selectedStack) {
+        document.getElementById('stack-display-name').value = this.options[this.selectedIndex].text;
+    }
     var primarySelect = document.getElementById('stack-primary-container');
     primarySelect.innerHTML = '<option value="">-- Select primary container --</option>';
     if (selectedStack) {
