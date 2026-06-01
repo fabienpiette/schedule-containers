@@ -21,12 +21,16 @@ import (
 )
 
 type mockOnDemandService struct {
-	wakeResult   *ondemand.WakeResult
-	wakeError    error
-	healthResult *ondemand.HealthResult
-	healthError  error
-	watched      []*models.Schedule
-	unwatched    []string
+	wakeResult        *ondemand.WakeResult
+	wakeError         error
+	healthResult      *ondemand.HealthResult
+	healthError       error
+	stackWakeResult   *ondemand.WakeResult
+	stackWakeError    error
+	stackHealthResult *ondemand.HealthResult
+	stackHealthError  error
+	watched           []*models.Schedule
+	unwatched         []string
 }
 
 func (m *mockOnDemandService) WakeContainer(ctx context.Context, name string) (*ondemand.WakeResult, error) {
@@ -36,6 +40,17 @@ func (m *mockOnDemandService) WakeContainer(ctx context.Context, name string) (*
 func (m *mockOnDemandService) CheckHealth(ctx context.Context, name string) (*ondemand.HealthResult, error) {
 	return m.healthResult, m.healthError
 }
+
+func (m *mockOnDemandService) WakeStack(ctx context.Context, name string) (*ondemand.WakeResult, error) {
+	return m.stackWakeResult, m.stackWakeError
+}
+
+func (m *mockOnDemandService) CheckStackHealth(ctx context.Context, name string) (*ondemand.HealthResult, error) {
+	return m.stackHealthResult, m.stackHealthError
+}
+
+func (m *mockOnDemandService) AddStack(stack *models.Stack)    {}
+func (m *mockOnDemandService) RemoveStack(stackID string) {}
 
 func (m *mockOnDemandService) Watch(schedule *models.Schedule) {
 	m.watched = append(m.watched, schedule)
@@ -71,7 +86,7 @@ func setupWakeTestServer(t *testing.T, mockODM *mockOnDemandService) (*Server, *
 	cfg := &config.Config{WebHost: "127.0.0.1", WebPort: 0}
 
 	dockerClient, _ := docker.NewClient("unix:///var/run/docker.sock")
-	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, mockODM, nil)
+	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, mockODM, mockODM)
 	return srv, mockSched
 }
 
@@ -120,7 +135,8 @@ func TestHandleWake_AlreadyRunning(t *testing.T) {
 
 func TestHandleWake_NotFound(t *testing.T) {
 	mockODM := &mockOnDemandService{
-		wakeError: ondemand.ErrScheduleNotFound,
+		wakeError:      ondemand.ErrScheduleNotFound,
+		stackWakeError: ondemand.ErrStackNotFound,
 	}
 	srv, _ := setupWakeTestServer(t, mockODM)
 

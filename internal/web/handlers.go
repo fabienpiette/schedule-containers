@@ -375,12 +375,22 @@ func (s *Server) handleWake(w http.ResponseWriter, r *http.Request) {
 	result, err := s.ondemand.WakeContainer(r.Context(), containerName)
 	if err != nil {
 		if errors.Is(err, ondemand.ErrScheduleNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			// Fall through: try as a stack name (e.g. user accessing /wake/{stackName}/).
+			result, err = s.stackOndemand.WakeStack(r.Context(), containerName)
+			if err != nil {
+				if errors.Is(err, ondemand.ErrStackNotFound) {
+					http.Error(w, "no on-demand schedule found for "+containerName, http.StatusNotFound)
+					return
+				}
+				slog.Error("wake stack failed", "stack", containerName, "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			slog.Error("wake container failed", "container", containerName, "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		slog.Error("wake container failed", "container", containerName, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	if result.Running {
@@ -401,12 +411,22 @@ func (s *Server) handleWakeStatus(w http.ResponseWriter, r *http.Request) {
 	result, err := s.ondemand.CheckHealth(r.Context(), containerName)
 	if err != nil {
 		if errors.Is(err, ondemand.ErrScheduleNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			// Fall through: try as a stack name.
+			result, err = s.stackOndemand.CheckStackHealth(r.Context(), containerName)
+			if err != nil {
+				if errors.Is(err, ondemand.ErrStackNotFound) {
+					http.Error(w, "no on-demand schedule found for "+containerName, http.StatusNotFound)
+					return
+				}
+				slog.Error("stack health check failed", "stack", containerName, "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			slog.Error("health check failed", "container", containerName, "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		slog.Error("health check failed", "container", containerName, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	if r.Header.Get("HX-Request") == "true" || wantsHTML(r) {
