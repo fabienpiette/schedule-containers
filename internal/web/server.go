@@ -86,6 +86,12 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	wakeContent, _ := embeddedFS.ReadFile("templates/wake.html")
 	templates["wake.html"] = template.Must(template.New("wake.html").Parse(string(wakeContent)))
 
+	loginContent, _ := embeddedFS.ReadFile("templates/login.html")
+	templates["login.html"] = template.Must(template.New("login.html").Parse(string(loginContent)))
+
+	setupContent, _ := embeddedFS.ReadFile("templates/setup.html")
+	templates["setup.html"] = template.Must(template.New("setup.html").Parse(string(setupContent)))
+
 	srv := &Server{
 		store:         s,
 		docker:        d,
