@@ -598,6 +598,127 @@ func TestStackNameUnique(t *testing.T) {
 	}
 }
 
+// --- User tests ---
+
+func TestCreateAndGetUser(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	u := &models.User{
+		Username:     "alice",
+		PasswordHash: "$2a$12$fakehash",
+		Role:         models.RoleAdmin,
+	}
+	created, err := s.CreateUser(ctx, u)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if created.ID == "" {
+		t.Error("expected non-empty ID")
+	}
+	if created.CreatedAt.IsZero() {
+		t.Error("expected non-zero CreatedAt")
+	}
+
+	byID, err := s.GetUserByID(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID: %v", err)
+	}
+	if byID.Username != "alice" || byID.Role != models.RoleAdmin {
+		t.Errorf("GetUserByID: got %+v", byID)
+	}
+
+	byName, err := s.GetUserByUsername(ctx, "alice")
+	if err != nil {
+		t.Fatalf("GetUserByUsername: %v", err)
+	}
+	if byName.ID != created.ID {
+		t.Errorf("GetUserByUsername: wrong ID %q", byName.ID)
+	}
+}
+
+func TestListAndCountUsers(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	n, err := s.CountUsers(ctx)
+	if err != nil {
+		t.Fatalf("CountUsers: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("expected 0 users initially, got %d", n)
+	}
+
+	_, _ = s.CreateUser(ctx, &models.User{Username: "u1", PasswordHash: "$h", Role: models.RoleReader})
+	_, _ = s.CreateUser(ctx, &models.User{Username: "u2", PasswordHash: "$h", Role: models.RoleWriter})
+
+	users, err := s.ListUsers(ctx)
+	if err != nil {
+		t.Fatalf("ListUsers: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users, got %d", len(users))
+	}
+	n, _ = s.CountUsers(ctx)
+	if n != 2 {
+		t.Errorf("CountUsers: expected 2, got %d", n)
+	}
+}
+
+func TestUpdateAndDeleteUser(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	created, _ := s.CreateUser(ctx, &models.User{Username: "carol", PasswordHash: "$h", Role: models.RoleReader})
+	created.Role = models.RoleWriter
+	if err := s.UpdateUser(ctx, created); err != nil {
+		t.Fatalf("UpdateUser: %v", err)
+	}
+
+	got, _ := s.GetUserByID(ctx, created.ID)
+	if got.Role != models.RoleWriter {
+		t.Errorf("role not updated: got %q", got.Role)
+	}
+
+	if err := s.DeleteUser(ctx, created.ID); err != nil {
+		t.Fatalf("DeleteUser: %v", err)
+	}
+	if _, err := s.GetUserByID(ctx, created.ID); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("expected ErrNoRows after delete, got %v", err)
+	}
+}
+
+func TestCountAdmins(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	_, _ = s.CreateUser(ctx, &models.User{Username: "adm", PasswordHash: "$h", Role: models.RoleAdmin})
+	_, _ = s.CreateUser(ctx, &models.User{Username: "rdr", PasswordHash: "$h", Role: models.RoleReader})
+
+	n, err := s.CountAdmins(ctx)
+	if err != nil {
+		t.Fatalf("CountAdmins: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("expected 1 admin, got %d", n)
+	}
+}
+
+func TestGetUserByOIDCSubject(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	_, _ = s.CreateUser(ctx, &models.User{Username: "oidcuser", PasswordHash: "", Role: models.RoleReader, OIDCSubject: "sub_abc123"})
+
+	got, err := s.GetUserByOIDCSubject(ctx, "sub_abc123")
+	if err != nil {
+		t.Fatalf("GetUserByOIDCSubject: %v", err)
+	}
+	if got.Username != "oidcuser" {
+		t.Errorf("got %q, want oidcuser", got.Username)
+	}
+}
+
 func TestMigrationV5_TablesExist(t *testing.T) {
 	s := tempDB(t)
 	var version int

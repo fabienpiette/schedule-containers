@@ -490,3 +490,108 @@ func scanStack(row *sql.Row) (*models.Stack, error) {
 	}
 	return &st, nil
 }
+
+// --- User CRUD ---
+
+const userColumns = `id, username, password_hash, role, oidc_subject, created_at, updated_at`
+
+func scanUser(row *sql.Row) (*models.User, error) {
+	u := &models.User{}
+	var role string
+	var oidcSubj sql.NullString
+	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &role, &oidcSubj, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		return nil, err
+	}
+	u.Role = models.Role(role)
+	u.OIDCSubject = oidcSubj.String
+	return u, nil
+}
+
+func scanUserFromRows(rows *sql.Rows) (*models.User, error) {
+	u := &models.User{}
+	var role string
+	var oidcSubj sql.NullString
+	if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &role, &oidcSubj, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		return nil, err
+	}
+	u.Role = models.Role(role)
+	u.OIDCSubject = oidcSubj.String
+	return u, nil
+}
+
+func (s *Store) CreateUser(ctx context.Context, u *models.User) (*models.User, error) {
+	id := uuid.New().String()
+	now := time.Now().UTC()
+	oidcSubj := sql.NullString{String: u.OIDCSubject, Valid: u.OIDCSubject != ""}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO users (id, username, password_hash, role, oidc_subject, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		id, u.Username, u.PasswordHash, string(u.Role), oidcSubj, now, now,
+	)
+	if err != nil {
+		return nil, err
+	}
+	result := *u
+	result.ID = id
+	result.CreatedAt = now
+	result.UpdatedAt = now
+	return &result, nil
+}
+
+func (s *Store) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+	return scanUser(s.db.QueryRowContext(ctx,
+		`SELECT `+userColumns+` FROM users WHERE id = ?`, id))
+}
+
+func (s *Store) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
+	return scanUser(s.db.QueryRowContext(ctx,
+		`SELECT `+userColumns+` FROM users WHERE username = ?`, username))
+}
+
+func (s *Store) GetUserByOIDCSubject(ctx context.Context, subject string) (*models.User, error) {
+	return scanUser(s.db.QueryRowContext(ctx,
+		`SELECT `+userColumns+` FROM users WHERE oidc_subject = ?`, subject))
+}
+
+func (s *Store) ListUsers(ctx context.Context) ([]*models.User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+userColumns+` FROM users ORDER BY created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var users []*models.User
+	for rows.Next() {
+		u, err := scanUserFromRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+func (s *Store) UpdateUser(ctx context.Context, u *models.User) error {
+	oidcSubj := sql.NullString{String: u.OIDCSubject, Valid: u.OIDCSubject != ""}
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET username = ?, password_hash = ?, role = ?, oidc_subject = ?, updated_at = ?
+		 WHERE id = ?`,
+		u.Username, u.PasswordHash, string(u.Role), oidcSubj, time.Now().UTC(), u.ID,
+	)
+	return err
+}
+
+func (s *Store) DeleteUser(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) CountUsers(ctx context.Context) (int, error) {
+	var n int
+	return n, s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n)
+}
+
+func (s *Store) CountAdmins(ctx context.Context) (int, error) {
+	var n int
+	return n, s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE role = 'admin'`).Scan(&n)
+}
