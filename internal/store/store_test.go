@@ -597,3 +597,20 @@ func TestStackNameUnique(t *testing.T) {
 		t.Error("expected unique constraint error")
 	}
 }
+
+func TestMigrationV5_TablesExist(t *testing.T) {
+	s := tempDB(t)
+	var version int
+	if err := s.db.QueryRow("SELECT MAX(version) FROM schema_version").Scan(&version); err != nil {
+		t.Fatalf("schema_version: %v", err)
+	}
+	if version < 5 {
+		t.Fatalf("expected schema version >= 5, got %d", version)
+	}
+	if _, err := s.db.Exec("SELECT id, username, password_hash, role, oidc_subject, created_at, updated_at FROM users LIMIT 0"); err != nil {
+		t.Fatalf("users table: %v", err)
+	}
+	if _, err := s.db.Exec("SELECT token, user_id, expires_at, created_at FROM sessions LIMIT 0"); err != nil {
+		t.Fatalf("sessions table: %v", err)
+	}
+}
