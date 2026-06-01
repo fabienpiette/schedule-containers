@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gndm/schedule-containers/internal/models"
 )
@@ -733,5 +734,72 @@ func TestMigrationV5_TablesExist(t *testing.T) {
 	}
 	if _, err := s.db.Exec("SELECT token, user_id, expires_at, created_at FROM sessions LIMIT 0"); err != nil {
 		t.Fatalf("sessions table: %v", err)
+	}
+}
+
+// --- Session tests ---
+
+func TestCreateAndGetSession(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	user, _ := s.CreateUser(ctx, &models.User{Username: "dave", PasswordHash: "$h", Role: models.RoleReader})
+	now := time.Now().UTC()
+	sess := &models.Session{
+		Token:     "tok_abc123",
+		UserID:    user.ID,
+		ExpiresAt: now.Add(24 * time.Hour),
+		CreatedAt: now,
+	}
+	if err := s.CreateSession(ctx, sess); err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+
+	gotSess, gotUser, err := s.GetSessionWithUser(ctx, "tok_abc123")
+	if err != nil {
+		t.Fatalf("GetSessionWithUser: %v", err)
+	}
+	if gotSess.Token != "tok_abc123" {
+		t.Errorf("token: got %q", gotSess.Token)
+	}
+	if gotUser.Username != "dave" {
+		t.Errorf("username: got %q", gotUser.Username)
+	}
+}
+
+func TestDeleteSession(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	user, _ := s.CreateUser(ctx, &models.User{Username: "eve", PasswordHash: "$h", Role: models.RoleReader})
+	now := time.Now().UTC()
+	_ = s.CreateSession(ctx, &models.Session{Token: "tok_del", UserID: user.ID, ExpiresAt: now.Add(time.Hour), CreatedAt: now})
+
+	if err := s.DeleteSession(ctx, "tok_del"); err != nil {
+		t.Fatalf("DeleteSession: %v", err)
+	}
+	_, _, err := s.GetSessionWithUser(ctx, "tok_del")
+	if !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("expected ErrNoRows after delete, got %v", err)
+	}
+}
+
+func TestDeleteExpiredSessions(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	user, _ := s.CreateUser(ctx, &models.User{Username: "frank", PasswordHash: "$h", Role: models.RoleReader})
+	now := time.Now().UTC()
+	_ = s.CreateSession(ctx, &models.Session{Token: "tok_expired", UserID: user.ID, ExpiresAt: now.Add(-time.Hour), CreatedAt: now.Add(-2 * time.Hour)})
+	_ = s.CreateSession(ctx, &models.Session{Token: "tok_valid", UserID: user.ID, ExpiresAt: now.Add(time.Hour), CreatedAt: now})
+
+	if err := s.DeleteExpiredSessions(ctx); err != nil {
+		t.Fatalf("DeleteExpiredSessions: %v", err)
+	}
+	if _, _, err := s.GetSessionWithUser(ctx, "tok_expired"); !errors.Is(err, sql.ErrNoRows) {
+		t.Error("expired session should have been deleted")
+	}
+	if _, _, err := s.GetSessionWithUser(ctx, "tok_valid"); err != nil {
+		t.Errorf("valid session should remain, got %v", err)
 	}
 }

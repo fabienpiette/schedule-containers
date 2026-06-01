@@ -595,3 +595,47 @@ func (s *Store) CountAdmins(ctx context.Context) (int, error) {
 	var n int
 	return n, s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE role = 'admin'`).Scan(&n)
 }
+
+// --- Session CRUD ---
+
+func (s *Store) CreateSession(ctx context.Context, sess *models.Session) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)`,
+		sess.Token, sess.UserID, sess.ExpiresAt, sess.CreatedAt,
+	)
+	return err
+}
+
+func (s *Store) GetSessionWithUser(ctx context.Context, token string) (*models.Session, *models.User, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT s.token, s.user_id, s.expires_at, s.created_at,
+		       u.id, u.username, u.password_hash, u.role, u.oidc_subject, u.created_at, u.updated_at
+		FROM sessions s
+		JOIN users u ON s.user_id = u.id
+		WHERE s.token = ?`, token)
+
+	sess := &models.Session{}
+	u := &models.User{}
+	var role string
+	var oidcSubj sql.NullString
+	err := row.Scan(
+		&sess.Token, &sess.UserID, &sess.ExpiresAt, &sess.CreatedAt,
+		&u.ID, &u.Username, &u.PasswordHash, &role, &oidcSubj, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	u.Role = models.Role(role)
+	u.OIDCSubject = oidcSubj.String
+	return sess, u, nil
+}
+
+func (s *Store) DeleteSession(ctx context.Context, token string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token = ?`, token)
+	return err
+}
+
+func (s *Store) DeleteExpiredSessions(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at < ?`, time.Now().UTC())
+	return err
+}
