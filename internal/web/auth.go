@@ -41,7 +41,7 @@ func (s *Server) requireRole(min models.Role) func(http.Handler) http.Handler {
 				}
 				sess, u, err := s.store.GetSessionWithUser(r.Context(), cookie.Value)
 				if err != nil || sess.ExpiresAt.Before(time.Now()) {
-					http.SetCookie(w, &http.Cookie{Name: "session_token", MaxAge: -1, Path: "/"})
+					http.SetCookie(w, &http.Cookie{Name: "session_token", MaxAge: -1, Path: "/", Secure: true, HttpOnly: true})
 					s.denyAccess(w, r, http.StatusUnauthorized)
 					return
 				}

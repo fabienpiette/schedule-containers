@@ -35,6 +35,16 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	role := models.Role(r.FormValue("role"))
 
+	if username == "" || password == "" {
+		users, _ := s.store.ListUsers(r.Context())
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_ = s.templates["admin_users.html"].ExecuteTemplate(w, "users-table", adminUsersData{
+			Users: users,
+			Error: "Username and password are required",
+		})
+		return
+	}
+
 	if role != models.RoleReader && role != models.RoleWriter && role != models.RoleAdmin {
 		role = models.RoleReader
 	}
@@ -104,6 +114,9 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.UpdateUser(r.Context(), user); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+	if newPassword != "" {
+		_ = s.store.DeleteSessionsByUserID(r.Context(), user.ID)
 	}
 
 	_ = s.templates["admin_users.html"].ExecuteTemplate(w, "users-row", user)

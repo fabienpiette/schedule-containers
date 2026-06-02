@@ -803,3 +803,23 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		t.Errorf("valid session should remain, got %v", err)
 	}
 }
+
+func TestDeleteSessionsByUserID(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	user, _ := s.CreateUser(ctx, &models.User{Username: "grace", PasswordHash: "$h", Role: models.RoleReader})
+	now := time.Now().UTC()
+	_ = s.CreateSession(ctx, &models.Session{Token: "tok_g1", UserID: user.ID, ExpiresAt: now.Add(time.Hour), CreatedAt: now})
+	_ = s.CreateSession(ctx, &models.Session{Token: "tok_g2", UserID: user.ID, ExpiresAt: now.Add(time.Hour), CreatedAt: now})
+
+	if err := s.DeleteSessionsByUserID(ctx, user.ID); err != nil {
+		t.Fatalf("DeleteSessionsByUserID: %v", err)
+	}
+	if _, _, err := s.GetSessionWithUser(ctx, "tok_g1"); !errors.Is(err, sql.ErrNoRows) {
+		t.Error("session 1 should be deleted")
+	}
+	if _, _, err := s.GetSessionWithUser(ctx, "tok_g2"); !errors.Is(err, sql.ErrNoRows) {
+		t.Error("session 2 should be deleted")
+	}
+}

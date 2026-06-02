@@ -22,7 +22,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	user, err := s.store.GetUserByUsername(r.Context(), username)
-	if err != nil || auth.VerifyPassword(user.PasswordHash, password) != nil {
+	hashToCheck := "$2a$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	if err == nil {
+		hashToCheck = user.PasswordHash
+	}
+	verifyErr := auth.VerifyPassword(hashToCheck, password)
+	if err != nil || verifyErr != nil {
 		s.renderStandalone(w, "login.html", authPageData{Error: "Invalid credentials"})
 		return
 	}
@@ -48,6 +53,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  sess.ExpiresAt,
 	})
@@ -58,7 +64,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie("session_token"); err == nil {
 		_ = s.store.DeleteSession(r.Context(), cookie.Value)
 	}
-	http.SetCookie(w, &http.Cookie{Name: "session_token", MaxAge: -1, Path: "/"})
+	http.SetCookie(w, &http.Cookie{Name: "session_token", MaxAge: -1, Path: "/", Secure: true, HttpOnly: true})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 

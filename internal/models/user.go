@@ -17,7 +17,15 @@ var roleOrder = map[Role]int{
 }
 
 func (r Role) AtLeast(min Role) bool {
-	return roleOrder[r] >= roleOrder[min]
+	rv, ok := roleOrder[r]
+	if !ok {
+		return false
+	}
+	mv, ok := roleOrder[min]
+	if !ok {
+		return false
+	}
+	return rv >= mv
 }
 
 type User struct {
