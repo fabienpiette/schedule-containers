@@ -1,4 +1,4 @@
-<h3 align="center">Schedule Docker container start/stop with cron expressions.<br>Stacks, on-demand wake, role-based auth. Single binary. No dependencies.</h3>
+<h3 align="center">Schedule Docker container start/stop with cron expressions.<br>Stacks, on-demand wake, role-based auth, OIDC login. Single binary. No dependencies.</h3>
 
 <p align="center">
   <img src="docs/demo.gif" alt="Demo" width="600">
@@ -18,6 +18,7 @@ docker compose up -d
 - **On-demand wake** — Wake stopped containers on access via `/wake/<container>/`, auto-redirect when healthy
 - **Inactivity auto-stop** — Stop containers after configurable idle timeout (monitors CPU and network activity)
 - **Role-based auth** — Login, sessions, and three roles (reader, writer, admin). First run prompts for admin setup
+- **OIDC login** — Authenticate via Pocket ID or any OpenID Connect provider alongside local passwords
 - **Tags** — Reusable schedule templates applied to multiple containers at once
 
 ## Install
@@ -103,11 +104,18 @@ For all options: `schedule-containers --help`
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 | `TZ` | `UTC` | Timezone for cron evaluation |
 | `PRESETS_PATH` | *(empty — uses embedded)* | Custom presets YAML; if set and file doesn't exist, embedded defaults are copied to it |
+| `OIDC_ISSUER` | *(empty)* | Pocket ID or OIDC provider URL (no trailing slash) |
+| `OIDC_CLIENT_ID` | *(empty)* | OIDC client ID |
+| `OIDC_CLIENT_SECRET` | *(empty)* | OIDC client secret |
+| `OIDC_REDIRECT_URL` | *(empty)* | OIDC callback URL (e.g. `https://yourapp.com/auth/oidc/callback`) |
+
+OIDC is disabled unless all four `OIDC_*` variables are set. When enabled, the login page shows a "Login with Pocket ID" button alongside local password auth.
 
 ## Known Issues
 
 - **Docker socket access** — Grants full container control; consider `tecnativa/docker-socket-proxy` for restricted access
 - **CLI doesn't hot-reload** — `schedule add` writes directly to SQLite; a running server picks up changes on restart
+- **OIDC auto-provisioning** — New OIDC users are created with the `reader` role. Admin must promote them manually.
 
 ## Documentation
 
@@ -123,4 +131,4 @@ Thanks to all [contributors](https://github.com/gndm/schedule-containers/graphs/
 
 ## License
 
-MIT
+[MIT](LICENSE)

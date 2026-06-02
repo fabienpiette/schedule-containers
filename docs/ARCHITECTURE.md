@@ -5,9 +5,9 @@ If you want to familiarize yourself with the codebase, you are in the right plac
 
 ## Bird's Eye View
 
-Schedule Containers is a single Go binary that keeps Docker containers running on a schedule. You define cron expressions for when a container should start and stop, and the scheduler ensures those actions happen at the right time. Stacks let you schedule groups of containers (Docker Compose stacks) together with a single cron pair. Tags let you define a schedule template and apply it to multiple containers at once. On-demand wake lets stopped containers be started via a URL and automatically stopped after inactivity. Role-based authentication (reader, writer, admin) protects all management endpoints; the first run creates an admin account. A web dashboard and REST API provide runtime management; a CLI handles offline operations and YAML import/export.
+Schedule Containers is a single Go binary that keeps Docker containers running on a schedule. You define cron expressions for when a container should start and stop, and the scheduler ensures those actions happen at the right time. Stacks let you schedule groups of containers (Docker Compose stacks) together with a single cron pair. Tags let you define a schedule template and apply it to multiple containers at once. On-demand wake lets stopped containers be started via a URL and automatically stopped after inactivity. Role-based authentication (reader, writer, admin) protects all management endpoints; OIDC login via Pocket ID or any OpenID Connect provider works alongside local passwords. A web dashboard and REST API provide runtime management; a CLI handles offline operations and YAML import/export.
 
-On startup, the `serve` command loads persisted schedules, stacks, and tags from SQLite, registers them with an in-process cron runner, starts the on-demand manager, and starts an HTTP server. If no users exist, all requests redirect to `/setup` to create the initial admin account. After setup, all management endpoints require session-based authentication with role checks. When a cron job fires, the scheduler calls the Docker API to start or stop the target container (or all containers in a stack). When a user accesses `/wake/<container>/`, the on-demand manager starts the container and redirects to the configured URL once healthy. The web dashboard and REST API create, toggle, and delete schedules, stacks, and tags, which dynamically add or remove cron jobs and idle trackers.
+On startup, the `serve` command loads persisted schedules, stacks, and tags from SQLite, registers them with an in-process cron runner, starts the on-demand manager, and starts an HTTP server. If OIDC is configured, the login page shows a Pocket ID button alongside local password auth. If no users exist, all requests redirect to `/setup` to create the initial admin account. After setup, all management endpoints require session-based authentication with role checks. When a cron job fires, the scheduler calls the Docker API to start or stop the target container (or all containers in a stack). When a user accesses `/wake/<container>/`, the on-demand manager starts the container and redirects to the configured URL once healthy.
 
 ```
                     ┌─────────────────────┐
@@ -41,7 +41,7 @@ On startup, the `serve` command loads persisted schedules, stacks, and tags from
                 └─────────────────┘
 ```
 
-The auth layer sits inside `web/` as middleware — `requireRole` and `firstRunRedirect` wrap HTTP handlers. Session tokens are stored in SQLite alongside users.
+The auth layer sits inside `web/` as middleware — `requireRole` and `firstRunRedirect` wrap HTTP handlers. Session tokens are stored in SQLite alongside users. OIDC flow adds `/auth/oidc/login` and `/auth/oidc/callback` as public routes.
 
 ## Code Map
 
@@ -65,19 +65,19 @@ Key files: `schedule.go`, `stack.go`, `user.go`, `container.go`, `tag.go`
 
 ### `internal/config/`
 
-Environment-based configuration. Reads `DB_PATH`, `DOCKER_HOST`, `WEB_PORT`, `WEB_HOST`, `LOG_LEVEL` from environment variables with sensible defaults.
+Environment-based configuration. Reads `DB_PATH`, `DOCKER_HOST`, `WEB_PORT`, `WEB_HOST`, `LOG_LEVEL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URL` from environment variables with sensible defaults. `OIDCEnabled()` returns true only when all four OIDC variables are set.
 
 Key files: `config.go`
 
 ### `internal/auth/`
 
-Password hashing and token generation. `HashPassword` and `VerifyPassword` wrap bcrypt. `GenerateToken` produces random session tokens. A leaf package — no imports from other internal packages.
+Password hashing and token generation. `HashPassword` and `VerifyPassword` wrap bcrypt (cost 12). `GenerateToken` produces random session tokens (32 bytes, hex-encoded). A leaf package — no imports from other internal packages.
 
 Key files: `auth.go`
 
 ### `internal/store/`
 
-SQLite persistence for schedules, stacks, tags, and users. Uses `modernc.org/sqlite` (pure Go, no CGO). `Open` runs schema migrations on startup with a `schema_version` table for versioned migrations. CRUD operations cover schedules, stacks, tags, and user/session management. `GetOnDemandSchedule` finds the on-demand-enabled schedule for a given container name. `DeleteTag` cascades to delete all schedules with the matching `tag_id`. A unique index on `(tag_id, container_name)` prevents duplicate schedules for the same tag+container. Sessions include expiry and are cleaned up on startup via `DeleteExpiredSessions`.
+SQLite persistence for schedules, stacks, tags, users, and sessions. Uses `modernc.org/sqlite` (pure Go, no CGO). `Open` runs schema migrations on startup with a `schema_version` table for versioned migrations. CRUD operations cover schedules, stacks, tags, and user/session management. `GetOnDemandSchedule` finds the on-demand-enabled schedule for a given container name. `DeleteTag` cascades to delete all schedules with the matching `tag_id`. A unique index on `(tag_id, container_name)` prevents duplicate schedules for the same tag+container. Sessions include expiry and are cleaned up on startup via `DeleteExpiredSessions`.
 
 Key files: `store.go`
 
@@ -123,9 +123,9 @@ Key files: `ondemand.go`, `idle.go`
 
 HTTP server, REST API, and Go templates with HTMX. Chi router for routing, `embed.FS` for templates and static assets baked into the binary. CSS custom properties drive dark/light theming (dark default, toggle persisted in `localStorage`). Routes serve both JSON and HTML: `wantsHTML` in `api.go` checks the `Accept` header and branches to `renderPartial` for HTMX requests or full page renders for browser navigation. Wake routes (`/wake/{name}/`, `/wake/{name}/status`) render a standalone template with HTMX polling for health status.
 
-Authentication is middleware-based: `firstRunRedirect` redirects to `/setup` when no users exist; `requireRole` enforces reader, writer, or admin access per route group. Public endpoints are `/login`, `/setup`, and `/wake/*` — all other endpoints require authentication. Sessions are cookie-based tokens stored in SQLite with expiry.
+Authentication is middleware-based: `firstRunRedirect` redirects to `/setup` when no users exist; `requireRole` enforces reader, writer, or admin access per route group. OIDC login uses PKCE with short-lived state cookies. Public endpoints are `/login`, `/setup`, `/auth/oidc/login`, `/auth/oidc/callback`, and `/wake/*` — all other endpoints require authentication. Sessions are cookie-based tokens stored in SQLite with expiry.
 
-Key files: `server.go` (routing, setup, middleware), `api.go` (JSON endpoints + HTMX content negotiation), `handlers.go` (HTML rendering, wake handlers), `auth.go` (role middleware, first-run redirect), `auth_handlers.go` (login/logout/setup), `admin_handlers.go` (user management), `templates/`, `static/`
+Key files: `server.go` (routing, setup, middleware), `api.go` (JSON endpoints + HTMX content negotiation), `handlers.go` (HTML rendering, wake handlers), `auth.go` (role middleware, first-run redirect), `auth_handlers.go` (login/logout/setup), `admin_handlers.go` (user management), `oidc.go` (OIDC provider, PKCE helpers), `oidc_handlers.go` (login/callback handlers), `templates/`, `static/`
 
 **Architecture Invariant:** The web layer depends on `SchedulerService`, `OnDemandService`, and `StackOnDemandService` interfaces, not concrete types. This allows testing with mocks.
 
@@ -139,7 +139,8 @@ Key files: `server.go` (routing, setup, middleware), `api.go` (JSON endpoints + 
 - **Cron format:** Always 5-field standard (`min hour day month weekday`), not 6-field with seconds.
 - **On-demand independence:** `OnDemandEnabled` works independently of `Enabled`. A schedule with `Enabled=false, OnDemandEnabled=true` has no cron start/stop but the wake URL and idle monitor still function. The `toggle` API endpoint only affects cron registration.
 - **OnDemandURL required when enabled:** When `OnDemandEnabled` is true, `OnDemandURL` must be a valid URL. The API validates this on create and update.
-- **Role-based access:** All management endpoints require authentication. Three roles — reader (read-only), writer (create/modify, no delete), admin (full access). Wake URLs remain public. First run creates the initial admin account via `/setup`.
+- **Role-based access:** All management endpoints require authentication. Three roles — reader (read-only), writer (create/modify, no delete), admin (full access including user management). Wake URLs remain public. First run creates the initial admin account via `/setup`.
+- **No OIDC auto-linking:** OIDC users are matched by subject claim (`oidc_subject`) or auto-provisioned as `reader`. The system never links an OIDC identity to an existing local account by username — this prevents account takeover.
 - **Single binary:** Templates, static assets, and default presets are embedded via `//go:embed`. No external files needed at runtime except the SQLite database, optional presets YAML override, and Docker socket.
 
 ## Cross-Cutting Concerns
@@ -149,7 +150,7 @@ Key files: `server.go` (routing, setup, middleware), `api.go` (JSON endpoints + 
 - **Configuration:** All via environment variables with defaults. No config files. See `internal/config/config.go`.
 - **Testing:** Unit tests with mocked dependencies. The `OnDemandDockerClient`, `OnDemandService`, and `StackOnDemandService` interfaces allow testing wake, idle, and stack logic with mocks. Docker client uses a transformation function (`transformContainers`) that's unit-testable without a Docker daemon. Web handlers tested with `httptest`.
 - **Concurrency:** The scheduler serializes cron actions per container using `sync.Mutex`. The on-demand manager serializes wake requests per container using a separate mutex map. The idle monitor spawns a goroutine per tracked container that streams Docker Stats and checks idle thresholds on a 5-second interval. The store uses SQLite's built-in serialization for concurrent reads/writes.
-- **Authentication:** Session tokens stored in SQLite, set as `HttpOnly` + `Secure` cookies. Passwords hashed with bcrypt (cost 12). Role checks are middleware — `requireRole(RoleReader)`, `requireRole(RoleWriter)`, `requireRole(RoleAdmin)`. `firstRunRedirect` middleware redirects to `/setup` when no users exist.
+- **Authentication:** Session tokens stored in SQLite, set as `HttpOnly` + `Secure` cookies. Passwords hashed with bcrypt (cost 12). OIDC login uses PKCE with short-lived state cookies. Role checks are middleware — `requireRole(RoleReader)`, `requireRole(RoleWriter)`, `requireRole(RoleAdmin)`. `firstRunRedirect` middleware redirects to `/setup` when no users exist.
 - **Database migrations:** Run automatically on startup in `store.Open()`. A `schema_version` table tracks the version. New columns are added via migration steps — never edit existing steps.
 
 ## A Typical Change
@@ -158,7 +159,7 @@ To add a new schedule field (e.g., `timezone`):
 
 1. Add the field to `internal/models/schedule.go` — `Timezone string`
 2. Add the column in `internal/store/store.go` — migration in `migrate()`, add to `CREATE TABLE` and all CRUD queries
-3. Update `internal/web/api.go` — the JSON decoder will pick up the new field automatically
+3. Update `internal/web/api.go` — the JSON decoder picks up the new field automatically; add validation if needed
 4. Update `internal/web/handlers.go` — add `Timezone` to `ScheduleView` and the template data
 5. Update `internal/web/templates/schedules.html` — add a column to the schedules table
 6. Update `internal/cli/schedule.go` — add a `--timezone` flag to the `add` command
