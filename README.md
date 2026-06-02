@@ -1,4 +1,4 @@
-<h3 align="center">Schedule Docker container start/stop with cron expressions.<br>Web dashboard + CLI. Single binary. No dependencies.</h3>
+<h3 align="center">Schedule Docker container start/stop with cron expressions.<br>Stacks, on-demand wake, role-based auth. Single binary. No dependencies.</h3>
 
 <p align="center">
   <img src="docs/demo.gif" alt="Demo" width="600">
@@ -8,17 +8,17 @@
 
 ```bash
 docker compose up -d
-# Open http://localhost:8080
+# Open http://localhost:8080 — first run creates an admin account
 ```
 
 ## Features
 
 - **Cron scheduling** — Start and stop containers on any 5-field cron expression (`0 8 * * 1-5` = weekdays at 8am)
+- **Stacks** — Schedule groups of containers (Docker Compose stacks) together with shared cron expressions and on-demand wake
 - **On-demand wake** — Wake stopped containers on access via `/wake/<container>/`, auto-redirect when healthy
 - **Inactivity auto-stop** — Stop containers after configurable idle timeout (monitors CPU and network activity)
+- **Role-based auth** — Login, sessions, and three roles (reader, writer, admin). First run prompts for admin setup
 - **Tags** — Reusable schedule templates applied to multiple containers at once
-- **Web dashboard** — Go templates + HTMX with dark/light theme, inline actions, toast notifications
-- **REST API** — Full CRUD for schedules, tags, presets; container start/stop; YAML import/export
 
 ## Install
 
@@ -78,9 +78,9 @@ curl -X POST http://localhost:8080/api/schedules \
   -H "Content-Type: application/json" \
   -d '{"container_name":"my-app","start_cron":"0 8 * * 1-5","stop_cron":"0 18 * * 1-5","enabled":true}'
 
-curl -X POST http://localhost:8080/api/schedules \
+curl -X POST http://localhost:8080/api/stacks \
   -H "Content-Type: application/json" \
-  -d '{"container_name":"my-app","start_cron":"0 8 * * 1-5","stop_cron":"0 18 * * 1-5","on_demand_enabled":true,"on_demand_url":"https://app.example.com","idle_timeout_sec":1800}'
+  -d '{"name":"my-stack","start_cron":"0 8 * * 1-5","stop_cron":"0 18 * * 1-5","enabled":true}'
 
 curl http://localhost:8080/api/containers/my-app/health
 curl http://localhost:8080/api/schedules/{id}/wake-url
@@ -88,7 +88,7 @@ curl http://localhost:8080/api/schedules/{id}/wake-url
 
 ### Dashboard
 
-Open `http://localhost:8080` — view containers, manage schedules, start/stop containers, create and apply tags, configure on-demand wake.
+Open `http://localhost:8080` — view containers, manage schedules and stacks, start/stop containers, create and apply tags, configure on-demand wake. First run redirects to a setup page to create the admin account.
 
 For all options: `schedule-containers --help`
 
@@ -101,11 +101,11 @@ For all options: `schedule-containers --help`
 | `WEB_PORT` | `8080` | Web server port |
 | `WEB_HOST` | `0.0.0.0` | Web server bind address |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `TZ` | `UTC` | Timezone for cron evaluation |
 | `PRESETS_PATH` | *(empty — uses embedded)* | Custom presets YAML; if set and file doesn't exist, embedded defaults are copied to it |
 
 ## Known Issues
 
-- **No authentication** — All endpoints, including `/wake/`, are unauthenticated. Designed for private networks behind a reverse proxy (Caddy, Nginx)
 - **Docker socket access** — Grants full container control; consider `tecnativa/docker-socket-proxy` for restricted access
 - **CLI doesn't hot-reload** — `schedule add` writes directly to SQLite; a running server picks up changes on restart
 
