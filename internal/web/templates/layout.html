@@ -35,16 +35,26 @@
             schedule-containers
         </a>
         <div class="nav-links">
-            
             <a href="/schedules" class="nav-link{{if eq .Title "Schedules"}} active{{end}}">Schedules</a>
             <a href="/tags" class="nav-link{{if eq .Title "Tags"}} active{{end}}">Tags</a>
             <a href="/containers" class="nav-link{{if eq .Title "Containers"}} active{{end}}">Containers</a>
             <a href="/presets" class="nav-link{{if eq .Title "Presets"}} active{{end}}">Presets</a>
+            {{if and .CurrentUser (eq (print .CurrentUser.Role) "admin")}}
+            <a href="/admin/users" class="nav-link{{if eq .Title "Users"}} active{{end}}">Users</a>
+            {{end}}
         </div>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
-            <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 018 2v6h6z" fill="currentColor"/><path d="M8 2a6 6 0 106 6H8V2z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-        </button>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            {{if .CurrentUser}}
+            <span style="font-size:0.8rem;color:var(--text-secondary);">{{.CurrentUser.Username}}</span>
+            <form method="POST" action="/logout" style="margin:0;">
+                <button type="submit" class="btn-ghost btn-sm">Logout</button>
+            </form>
+            {{end}}
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 018 2v6h6z" fill="currentColor"/><path d="M8 2a6 6 0 106 6H8V2z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </button>
+        </div>
     </nav>
     <main>
         {{template "content" .}}

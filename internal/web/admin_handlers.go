@@ -11,10 +11,10 @@ import (
 )
 
 type adminUsersData struct {
-	CurrentUser *models.User
-	Title       string
-	Users       []*models.User
-	Error       string
+	PageBase
+	Title string
+	Users []*models.User
+	Error string
 }
 
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
@@ -24,9 +24,9 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderPage(w, "admin_users.html", adminUsersData{
-		CurrentUser: UserFromContext(r.Context()),
-		Title:       "Users",
-		Users:       users,
+		PageBase: PageBase{CurrentUser: UserFromContext(r.Context())},
+		Title:    "Users",
+		Users:    users,
 	})
 }
 

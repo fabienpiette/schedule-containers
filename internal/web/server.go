@@ -109,13 +109,13 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 
 	staticContent, _ := fs.Sub(embeddedFS, "static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticContent))))
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/schedules", http.StatusMovedPermanently)
-	})
-	r.Get("/containers", srv.handleContainers)
-	r.Get("/schedules", srv.handleSchedulesNew)
-	r.Get("/presets", srv.handlePresets)
-	r.Get("/tags", srv.handleTags)
+
+	// Public routes — no auth required
+	r.Get("/login", srv.handleLogin)
+	r.Post("/login", srv.handleLogin)
+	r.Post("/logout", srv.handleLogout)
+	r.Get("/setup", srv.handleSetup)
+	r.Post("/setup", srv.handleSetup)
 	r.Get("/wake/stack/{name}", srv.handleWakeStack)
 	r.Get("/wake/stack/{name}/", srv.handleWakeStack)
 	r.Get("/wake/stack/{name}/status", srv.handleWakeStackStatus)
@@ -123,36 +123,70 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	r.Get("/wake/{name}/", srv.handleWake)
 	r.Get("/wake/{name}/status", srv.handleWakeStatus)
 
-	r.Route("/api", func(r chi.Router) {
-		r.Get("/containers", srv.apiListContainers)
-		r.Get("/containers/{name}/health", srv.apiContainerHealth)
-		r.Get("/schedules", srv.apiListSchedules)
-		r.Get("/schedules/{id}/wake-url", srv.apiWakeURL)
-		r.Post("/schedules", srv.apiCreateSchedule)
-		r.Put("/schedules/{id}", srv.apiUpdateSchedule)
-		r.Delete("/schedules/{id}", srv.apiDeleteSchedule)
-		r.Post("/schedules/{id}/toggle", srv.apiToggleSchedule)
-		r.Post("/containers/{name}/start", srv.apiStartContainer)
-		r.Post("/containers/{name}/stop", srv.apiStopContainer)
-		r.Get("/presets", srv.apiListPresets)
-		r.Post("/presets", srv.apiCreateCustomPreset)
-		r.Delete("/presets/{id}", srv.apiDeleteCustomPreset)
-		r.Get("/tags", srv.apiListTags)
-		r.Post("/tags", srv.apiCreateTag)
-		r.Get("/tags/{id}", srv.apiGetTag)
-		r.Put("/tags/{id}", srv.apiUpdateTag)
-		r.Delete("/tags/{id}", srv.apiDeleteTag)
-		r.Post("/tags/{id}/containers", srv.apiApplyTagToContainers)
-		r.Delete("/tags/{id}/containers/{name}", srv.apiRemoveTagFromContainer)
-		r.Post("/tags/{id}/toggle", srv.apiToggleTag)
-		r.Get("/stacks", srv.apiListStacks)
-		r.Post("/stacks", srv.apiCreateStack)
-		r.Get("/stacks/{id}", srv.apiGetStack)
-		r.Put("/stacks/{id}", srv.apiUpdateStack)
-		r.Delete("/stacks/{id}", srv.apiDeleteStack)
-		r.Post("/stacks/{id}/toggle", srv.apiToggleStack)
-		r.Post("/import", srv.apiImportSchedules)
-		r.Get("/export", srv.apiExportSchedules)
+	// Protected routes — reader role minimum
+	r.Group(func(r chi.Router) {
+		r.Use(srv.firstRunRedirect)
+		r.Use(srv.requireRole(models.RoleReader))
+
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/schedules", http.StatusMovedPermanently)
+		})
+		r.Get("/containers", srv.handleContainers)
+		r.Get("/schedules", srv.handleSchedulesNew)
+		r.Get("/presets", srv.handlePresets)
+		r.Get("/tags", srv.handleTags)
+
+		r.Route("/api", func(r chi.Router) {
+			// Reader endpoints
+			r.Get("/containers", srv.apiListContainers)
+			r.Get("/containers/{name}/health", srv.apiContainerHealth)
+			r.Get("/schedules", srv.apiListSchedules)
+			r.Get("/schedules/{id}/wake-url", srv.apiWakeURL)
+			r.Get("/presets", srv.apiListPresets)
+			r.Get("/tags", srv.apiListTags)
+			r.Get("/tags/{id}", srv.apiGetTag)
+			r.Get("/stacks", srv.apiListStacks)
+			r.Get("/stacks/{id}", srv.apiGetStack)
+
+			// Writer endpoints
+			r.Group(func(r chi.Router) {
+				r.Use(srv.requireRole(models.RoleWriter))
+				r.Post("/schedules", srv.apiCreateSchedule)
+				r.Put("/schedules/{id}", srv.apiUpdateSchedule)
+				r.Post("/schedules/{id}/toggle", srv.apiToggleSchedule)
+				r.Post("/containers/{name}/start", srv.apiStartContainer)
+				r.Post("/containers/{name}/stop", srv.apiStopContainer)
+				r.Post("/presets", srv.apiCreateCustomPreset)
+				r.Post("/tags", srv.apiCreateTag)
+				r.Put("/tags/{id}", srv.apiUpdateTag)
+				r.Delete("/tags/{id}/containers/{name}", srv.apiRemoveTagFromContainer)
+				r.Post("/tags/{id}/containers", srv.apiApplyTagToContainers)
+				r.Post("/tags/{id}/toggle", srv.apiToggleTag)
+				r.Post("/stacks", srv.apiCreateStack)
+				r.Put("/stacks/{id}", srv.apiUpdateStack)
+				r.Post("/stacks/{id}/toggle", srv.apiToggleStack)
+				r.Post("/import", srv.apiImportSchedules)
+			})
+
+			// Admin endpoints
+			r.Group(func(r chi.Router) {
+				r.Use(srv.requireRole(models.RoleAdmin))
+				r.Delete("/schedules/{id}", srv.apiDeleteSchedule)
+				r.Delete("/presets/{id}", srv.apiDeleteCustomPreset)
+				r.Delete("/tags/{id}", srv.apiDeleteTag)
+				r.Delete("/stacks/{id}", srv.apiDeleteStack)
+				r.Get("/export", srv.apiExportSchedules)
+			})
+		})
+
+		// Admin pages
+		r.Group(func(r chi.Router) {
+			r.Use(srv.requireRole(models.RoleAdmin))
+			r.Get("/admin/users", srv.handleAdminUsers)
+			r.Post("/admin/users", srv.handleAdminCreateUser)
+			r.Put("/admin/users/{id}", srv.handleAdminUpdateUser)
+			r.Delete("/admin/users/{id}", srv.handleAdminDeleteUser)
+		})
 	})
 
 	addr := fmt.Sprintf("%s:%d", cfg.WebHost, cfg.WebPort)

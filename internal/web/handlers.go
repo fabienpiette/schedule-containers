@@ -18,6 +18,10 @@ import (
 
 
 
+type PageBase struct {
+	CurrentUser *models.User
+}
+
 type ScheduleView struct {
 	ID               string
 	ContainerName    string
@@ -76,12 +80,14 @@ type TagOption struct {
 }
 
 type ContainersData struct {
+	PageBase
 	Title      string
 	Containers []ContainerView
 	Tags       []TagOption
 }
 
 type SchedulesData struct {
+	PageBase
 	Title          string
 	Containers     []ContainerView
 	Schedules      []ScheduleView
@@ -93,6 +99,7 @@ type SchedulesData struct {
 }
 
 type PresetsData struct {
+	PageBase
 	Title   string
 	Presets []PresetView
 }
@@ -103,6 +110,7 @@ type StackView struct {
 }
 
 type TagsData struct {
+	PageBase
 	Title           string
 	Tags            []TagView
 	Containers      []string
@@ -243,6 +251,7 @@ func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 	slices.SortFunc(views, func(a, b ContainerView) int { return cmp.Compare(a.Name, b.Name) })
 
 	s.renderPage(w, "containers.html", ContainersData{
+		PageBase:   PageBase{CurrentUser: UserFromContext(r.Context())},
 		Title:      "Containers",
 		Containers: views,
 		Tags:       tagOptions,
@@ -299,6 +308,7 @@ func (s *Server) handleSchedulesNew(w http.ResponseWriter, r *http.Request) {
 	slices.SortFunc(scheduleViews, func(a, b ScheduleView) int { return cmp.Compare(a.DisplayName, b.DisplayName) })
 
 	s.renderPage(w, "schedules.html", SchedulesData{
+		PageBase:       PageBase{CurrentUser: UserFromContext(r.Context())},
 		Title:          "Schedules",
 		Containers:     containerViews,
 		Schedules:      scheduleViews,
@@ -323,8 +333,9 @@ func (s *Server) handlePresets(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.renderPage(w, "presets.html", PresetsData{
-		Title:   "Presets",
-		Presets: presetViews,
+		PageBase: PageBase{CurrentUser: UserFromContext(r.Context())},
+		Title:    "Presets",
+		Presets:  presetViews,
 	})
 }
 
@@ -362,6 +373,7 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 	slices.SortFunc(tagViews, func(a, b TagView) int { return cmp.Compare(a.Name, b.Name) })
 
 	s.renderPage(w, "tags.html", TagsData{
+		PageBase:        PageBase{CurrentUser: UserFromContext(r.Context())},
 		Title:           "Tags",
 		Tags:            tagViews,
 		Containers:      containerNames,

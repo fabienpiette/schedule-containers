@@ -38,6 +38,10 @@ var serveCmd = &cobra.Command{
 		}
 		defer db.Close()
 
+		if err := db.DeleteExpiredSessions(context.Background()); err != nil {
+			slog.Warn("failed to purge expired sessions", "error", err)
+		}
+
 		dockerClient, err := docker.NewClient(cfg.DockerHost)
 		if err != nil {
 			slog.Error("failed to connect to Docker", "error", err)
