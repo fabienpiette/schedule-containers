@@ -71,10 +71,11 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		"templates/partials.html",
 	}
 	pages := map[string]string{
-		"containers.html": "templates/containers.html",
-		"schedules.html":  "templates/schedules.html",
-		"presets.html":    "templates/presets.html",
-		"tags.html":       "templates/tags.html",
+		"containers.html":  "templates/containers.html",
+		"schedules.html":   "templates/schedules.html",
+		"presets.html":     "templates/presets.html",
+		"tags.html":        "templates/tags.html",
+		"admin_users.html": "templates/admin_users.html",
 	}
 
 	templates := make(map[string]*template.Template)
