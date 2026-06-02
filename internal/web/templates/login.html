@@ -37,6 +37,13 @@
             </div>
             <button class="btn-primary" type="submit">Sign in</button>
         </form>
+        {{if .OIDCEnabled}}
+        <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);text-align:center;">
+            <a href="/auth/oidc/login"
+               style="display:inline-block;width:100%;box-sizing:border-box;text-align:center;text-decoration:none;"
+               class="btn-secondary">Login with Pocket ID</a>
+        </div>
+        {{end}}
     </div>
 </body>
 </html>

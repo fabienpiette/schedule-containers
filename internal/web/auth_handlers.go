@@ -9,12 +9,15 @@ import (
 )
 
 type authPageData struct {
-	Error string
+	Error       string
+	OIDCEnabled bool
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	oidcEnabled := s.oidcProvider != nil
+
 	if r.Method == http.MethodGet {
-		s.renderStandalone(w, "login.html", authPageData{})
+		s.renderStandalone(w, "login.html", authPageData{OIDCEnabled: oidcEnabled})
 		return
 	}
 
@@ -28,7 +31,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	verifyErr := auth.VerifyPassword(hashToCheck, password)
 	if err != nil || verifyErr != nil {
-		s.renderStandalone(w, "login.html", authPageData{Error: "Invalid credentials"})
+		s.renderStandalone(w, "login.html", authPageData{Error: "Invalid credentials", OIDCEnabled: oidcEnabled})
 		return
 	}
 

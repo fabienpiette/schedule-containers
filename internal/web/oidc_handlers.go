@@ -136,18 +136,11 @@ func (s *Server) resolveOIDCUser(ctx context.Context, info *oidcUserInfo) (*mode
 		username = info.Sub
 	}
 
-	// 2. Link existing local account by username
-	if user, err := s.store.GetUserByUsername(ctx, username); err == nil {
-		user.OIDCSubject = info.Sub
-		if err := s.store.UpdateUser(ctx, user); err != nil {
-			return nil, err
-		}
-		return user, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-
-	// 3. Auto-provision new reader account
+	// 2. Auto-provision new reader account
+	// NOTE: We intentionally do NOT auto-link OIDC identities to existing local
+	// accounts by username. Doing so would allow an attacker who controls an OIDC
+	// identity with a matching preferred_username to take over any local account.
+	// Account linking must be done explicitly via an admin action or settings page.
 	return s.store.CreateUser(ctx, &models.User{
 		Username:     username,
 		PasswordHash: "",

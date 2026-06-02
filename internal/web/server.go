@@ -129,6 +129,8 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	r.Get("/wake/stack/{name}", srv.handleWakeStack)
 	r.Get("/wake/stack/{name}/", srv.handleWakeStack)
 	r.Get("/wake/stack/{name}/status", srv.handleWakeStackStatus)
+	r.Get("/auth/oidc/login", srv.handleOIDCLogin)
+	r.Get("/auth/oidc/callback", srv.handleOIDCCallback)
 	r.Get("/wake/{name}", srv.handleWake)
 	r.Get("/wake/{name}/", srv.handleWake)
 	r.Get("/wake/{name}/status", srv.handleWakeStatus)
