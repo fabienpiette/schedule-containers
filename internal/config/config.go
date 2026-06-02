@@ -7,24 +7,32 @@ import (
 )
 
 type Config struct {
-	DBPath      string
-	LogLevel    string
-	WebPort     int
-	WebHost     string
-	DockerHost  string
-	PresetsPath string
-	Timezone    string
+	DBPath           string
+	LogLevel         string
+	WebPort          int
+	WebHost          string
+	DockerHost       string
+	PresetsPath      string
+	Timezone         string
+	OIDCIssuer       string
+	OIDCClientID     string
+	OIDCClientSecret string
+	OIDCRedirectURL  string
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		DBPath:      envOrDefault("DB_PATH", "/data/schedule-containers.db"),
-		LogLevel:    envOrDefault("LOG_LEVEL", "info"),
-		WebPort:     8080,
-		WebHost:     envOrDefault("WEB_HOST", "0.0.0.0"),
-		DockerHost:  envOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock"),
-		PresetsPath: envOrDefault("PRESETS_PATH", ""),
-		Timezone:    envOrDefault("TZ", "UTC"),
+		DBPath:           envOrDefault("DB_PATH", "/data/schedule-containers.db"),
+		LogLevel:         envOrDefault("LOG_LEVEL", "info"),
+		WebPort:          8080,
+		WebHost:          envOrDefault("WEB_HOST", "0.0.0.0"),
+		DockerHost:       envOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock"),
+		PresetsPath:      envOrDefault("PRESETS_PATH", ""),
+		Timezone:         envOrDefault("TZ", "UTC"),
+		OIDCIssuer:       envOrDefault("OIDC_ISSUER", ""),
+		OIDCClientID:     envOrDefault("OIDC_CLIENT_ID", ""),
+		OIDCClientSecret: envOrDefault("OIDC_CLIENT_SECRET", ""),
+		OIDCRedirectURL:  envOrDefault("OIDC_REDIRECT_URL", ""),
 	}
 
 	if v := os.Getenv("WEB_PORT"); v != "" {
@@ -36,6 +44,11 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func (c *Config) OIDCEnabled() bool {
+	return c.OIDCIssuer != "" && c.OIDCClientID != "" &&
+		c.OIDCClientSecret != "" && c.OIDCRedirectURL != ""
 }
 
 func envOrDefault(key, def string) string {
