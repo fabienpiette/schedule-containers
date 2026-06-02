@@ -54,6 +54,7 @@ type Server struct {
 	ondemand      OnDemandService
 	stackOndemand StackOnDemandService
 	templates     map[string]*template.Template
+	oidcProvider  *oidcProvider
 }
 
 //go:embed templates/* static/*
@@ -101,6 +102,15 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		ondemand:      odm,
 		stackOndemand: sodm,
 		templates:     templates,
+	}
+
+	if cfg.OIDCEnabled() {
+		if provider, err := newOIDCProvider(cfg); err != nil {
+			slog.Warn("OIDC initialization failed — OIDC login disabled", "error", err)
+		} else {
+			srv.oidcProvider = provider
+			slog.Info("OIDC initialized", "issuer", cfg.OIDCIssuer)
+		}
 	}
 
 	r := chi.NewRouter()
