@@ -115,7 +115,7 @@ OIDC is disabled unless all four `OIDC_*` variables are set. When enabled, the l
 
 - **Docker socket access** — Grants full container control; consider `tecnativa/docker-socket-proxy` for restricted access
 - **CLI doesn't hot-reload** — `schedule add` writes directly to SQLite; a running server picks up changes on restart
-- **OIDC auto-provisioning** — New OIDC users are created with the `reader` role. Admin must promote them manually.
+- **OIDC auto-provisioning** — New OIDC users are created with the `reader` role. Admins can promote them or link them to an existing local account via the admin panel.
 
 ## Documentation
 

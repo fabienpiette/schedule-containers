@@ -125,7 +125,7 @@ HTTP server, REST API, and Go templates with HTMX. Chi router for routing, `embe
 
 Authentication is middleware-based: `firstRunRedirect` redirects to `/setup` when no users exist; `requireRole` enforces reader, writer, or admin access per route group. OIDC login uses PKCE with short-lived state cookies. Public endpoints are `/login`, `/setup`, `/auth/oidc/login`, `/auth/oidc/callback`, and `/wake/*` — all other endpoints require authentication. Sessions are cookie-based tokens stored in SQLite with expiry.
 
-Key files: `server.go` (routing, setup, middleware), `api.go` (JSON endpoints + HTMX content negotiation), `handlers.go` (HTML rendering, wake handlers), `auth.go` (role middleware, first-run redirect), `auth_handlers.go` (login/logout/setup), `admin_handlers.go` (user management), `oidc.go` (OIDC provider, PKCE helpers), `oidc_handlers.go` (login/callback handlers), `templates/`, `static/`
+Key files: `server.go` (routing, setup, middleware), `api.go` (JSON endpoints + HTMX content negotiation), `handlers.go` (HTML rendering, wake handlers), `auth.go` (role middleware, first-run redirect), `auth_handlers.go` (login/logout/setup), `admin_handlers.go` (user management, account linking), `oidc.go` (OIDC provider, PKCE helpers), `oidc_handlers.go` (login/callback handlers), `templates/`, `static/`
 
 **Architecture Invariant:** The web layer depends on `SchedulerService`, `OnDemandService`, and `StackOnDemandService` interfaces, not concrete types. This allows testing with mocks.
 
@@ -140,7 +140,7 @@ Key files: `server.go` (routing, setup, middleware), `api.go` (JSON endpoints + 
 - **On-demand independence:** `OnDemandEnabled` works independently of `Enabled`. A schedule with `Enabled=false, OnDemandEnabled=true` has no cron start/stop but the wake URL and idle monitor still function. The `toggle` API endpoint only affects cron registration.
 - **OnDemandURL required when enabled:** When `OnDemandEnabled` is true, `OnDemandURL` must be a valid URL. The API validates this on create and update.
 - **Role-based access:** All management endpoints require authentication. Three roles — reader (read-only), writer (create/modify, no delete), admin (full access including user management). Wake URLs remain public. First run creates the initial admin account via `/setup`.
-- **No OIDC auto-linking:** OIDC users are matched by subject claim (`oidc_subject`) or auto-provisioned as `reader`. The system never links an OIDC identity to an existing local account by username — this prevents account takeover.
+- **No OIDC auto-linking:** OIDC users are matched by subject claim (`oidc_subject`) or auto-provisioned as `reader`. The system never links an OIDC identity to an existing local account by username — this prevents account takeover. Admins can manually link an OIDC account to a local account via the admin panel (`POST /admin/users/{id}/link-oidc`), which transfers the `oidc_subject`, deletes the OIDC account, and invalidates both users' sessions.
 - **Single binary:** Templates, static assets, and default presets are embedded via `//go:embed`. No external files needed at runtime except the SQLite database, optional presets YAML override, and Docker socket.
 
 ## Cross-Cutting Concerns
