@@ -2,6 +2,7 @@ package web
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -12,9 +13,20 @@ import (
 
 type adminUsersData struct {
 	PageBase
-	Title string
-	Users []*models.User
-	Error string
+	Title     string
+	Users     []*models.User
+	OIDCUsers []*models.User
+	Error     string
+}
+
+func oidcOnlyUsers(users []*models.User) []*models.User {
+	var result []*models.User
+	for _, u := range users {
+		if u.OIDCSubject != "" && u.PasswordHash == "" {
+			result = append(result, u)
+		}
+	}
+	return result
 }
 
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
@@ -24,9 +36,10 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderPage(w, "admin_users.html", adminUsersData{
-		PageBase: PageBase{CurrentUser: UserFromContext(r.Context())},
-		Title:    "Users",
-		Users:    users,
+		PageBase:  PageBase{CurrentUser: UserFromContext(r.Context())},
+		Title:     "Users",
+		Users:     users,
+		OIDCUsers: oidcOnlyUsers(users),
 	})
 }
 
@@ -39,8 +52,9 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		users, _ := s.store.ListUsers(r.Context())
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = s.templates["admin_users.html"].ExecuteTemplate(w, "users-table", adminUsersData{
-			Users: users,
-			Error: "Username and password are required",
+			Users:     users,
+			OIDCUsers: oidcOnlyUsers(users),
+			Error:     "Username and password are required",
 		})
 		return
 	}
@@ -63,8 +77,9 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		users, _ := s.store.ListUsers(r.Context())
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = s.templates["admin_users.html"].ExecuteTemplate(w, "users-table", adminUsersData{
-			Users: users,
-			Error: "Username already exists",
+			Users:     users,
+			OIDCUsers: oidcOnlyUsers(users),
+			Error:     "Username already exists",
 		})
 		return
 	}
@@ -154,4 +169,65 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleAdminLinkOIDC(w http.ResponseWriter, r *http.Request) {
+	targetID := chi.URLParam(r, "id")
+
+	var body struct {
+		OIDCUserID string `json:"oidc_user_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	currentUser := UserFromContext(r.Context())
+	if currentUser != nil && currentUser.ID == body.OIDCUserID {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"error": "cannot use your own account as the OIDC source"})
+		return
+	}
+
+	if body.OIDCUserID == targetID {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"error": "cannot link an account to itself"})
+		return
+	}
+
+	source, err := s.store.GetUserByID(r.Context(), body.OIDCUserID)
+	if errors.Is(err, sql.ErrNoRows) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if source.Role == models.RoleAdmin {
+		n, _ := s.store.CountAdmins(r.Context())
+		if n <= 1 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"error": "cannot delete last admin account"})
+			return
+		}
+	}
+
+	if err := s.store.LinkOIDCAccount(r.Context(), targetID, body.OIDCUserID); err != nil {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	isSelf := currentUser != nil && currentUser.ID == targetID
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"is_self": isSelf,
+	})
 }

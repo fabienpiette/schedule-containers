@@ -28,6 +28,15 @@ func tempDB(t *testing.T) *Store {
 	return s
 }
 
+func mustCreateUser(t *testing.T, s *Store, u *models.User) *models.User {
+	t.Helper()
+	created, err := s.CreateUser(context.Background(), u)
+	if err != nil {
+		t.Fatalf("mustCreateUser(%+v): %v", u, err)
+	}
+	return created
+}
+
 // --- Schedule tests ---
 
 func TestOpenAndMigrate(t *testing.T) {
@@ -821,5 +830,68 @@ func TestDeleteSessionsByUserID(t *testing.T) {
 	}
 	if _, _, err := s.GetSessionWithUser(ctx, "tok_g2"); !errors.Is(err, sql.ErrNoRows) {
 		t.Error("session 2 should be deleted")
+	}
+}
+
+func TestLinkOIDCAccount(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	admin := mustCreateUser(t, s, &models.User{
+		Username: "admin", PasswordHash: "hash", Role: models.RoleAdmin,
+	})
+	oidcUser := mustCreateUser(t, s, &models.User{
+		Username: "oidcadmin", PasswordHash: "", Role: models.RoleReader, OIDCSubject: "sub-123",
+	})
+
+	if err := s.LinkOIDCAccount(ctx, admin.ID, oidcUser.ID); err != nil {
+		t.Fatalf("LinkOIDCAccount: %v", err)
+	}
+
+	got, err := s.GetUserByID(ctx, admin.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID: %v", err)
+	}
+	if got.OIDCSubject != "sub-123" {
+		t.Errorf("admin OIDCSubject = %q, want %q", got.OIDCSubject, "sub-123")
+	}
+
+	if _, err := s.GetUserByID(ctx, oidcUser.ID); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("expected oidc user to be deleted, got err=%v", err)
+	}
+}
+
+func TestLinkOIDCAccountErrors(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	admin := mustCreateUser(t, s, &models.User{
+		Username: "admin2", PasswordHash: "hash", Role: models.RoleReader, OIDCSubject: "existing-sub",
+	})
+	oidcUser := mustCreateUser(t, s, &models.User{
+		Username: "oidc2", PasswordHash: "", Role: models.RoleReader, OIDCSubject: "sub-2",
+	})
+	if err := s.LinkOIDCAccount(ctx, admin.ID, oidcUser.ID); err == nil {
+		t.Error("expected error when target already has OIDCSubject")
+	}
+
+	localUser := mustCreateUser(t, s, &models.User{
+		Username: "local2", PasswordHash: "hash", Role: models.RoleReader,
+	})
+	targetNoOIDC := mustCreateUser(t, s, &models.User{
+		Username: "target2", PasswordHash: "hash", Role: models.RoleReader,
+	})
+	if err := s.LinkOIDCAccount(ctx, targetNoOIDC.ID, localUser.ID); err == nil {
+		t.Error("expected error when source has no OIDCSubject")
+	}
+
+	lastAdmin := mustCreateUser(t, s, &models.User{
+		Username: "lastadmin", PasswordHash: "hash", Role: models.RoleAdmin, OIDCSubject: "sub-last",
+	})
+	readerTarget := mustCreateUser(t, s, &models.User{
+		Username: "readertgt", PasswordHash: "hash", Role: models.RoleReader,
+	})
+	if err := s.LinkOIDCAccount(ctx, readerTarget.ID, lastAdmin.ID); err == nil {
+		t.Error("expected error when source is last admin")
 	}
 }

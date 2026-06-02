@@ -198,6 +198,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 			r.Post("/admin/users", srv.handleAdminCreateUser)
 			r.Put("/admin/users/{id}", srv.handleAdminUpdateUser)
 			r.Delete("/admin/users/{id}", srv.handleAdminDeleteUser)
+			r.Post("/admin/users/{id}/link-oidc", srv.handleAdminLinkOIDC)
 		})
 	})
 

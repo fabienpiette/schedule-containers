@@ -586,6 +586,82 @@ func (s *Store) DeleteUser(ctx context.Context, id string) error {
 	return err
 }
 
+func (s *Store) LinkOIDCAccount(ctx context.Context, targetUserID, sourceUserID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var targetOIDC sql.NullString
+	err = tx.QueryRowContext(ctx,
+		`SELECT oidc_subject FROM users WHERE id = ?`, targetUserID,
+	).Scan(&targetOIDC)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("target user not found")
+		}
+		return err
+	}
+	if targetOIDC.Valid && targetOIDC.String != "" {
+		return fmt.Errorf("target user already has an OIDC account linked")
+	}
+
+	var sourceOIDC sql.NullString
+	var sourceRole string
+	err = tx.QueryRowContext(ctx,
+		`SELECT oidc_subject, role FROM users WHERE id = ?`, sourceUserID,
+	).Scan(&sourceOIDC, &sourceRole)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("source user not found")
+		}
+		return err
+	}
+	if !sourceOIDC.Valid || sourceOIDC.String == "" {
+		return fmt.Errorf("source user has no OIDC account to link")
+	}
+
+	if models.Role(sourceRole) == models.RoleAdmin {
+		var adminCount int
+		err = tx.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM users WHERE role = 'admin'`).Scan(&adminCount)
+		if err != nil {
+			return err
+		}
+		if adminCount <= 1 {
+			return fmt.Errorf("cannot delete last admin account")
+		}
+	}
+
+	_, err = tx.ExecContext(ctx,
+		`UPDATE users SET oidc_subject = NULL WHERE id = ?`, sourceUserID,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx,
+		`UPDATE users SET oidc_subject = ?, updated_at = ? WHERE id = ?`,
+		sourceOIDC.String, time.Now().UTC(), targetUserID,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, sourceUserID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, targetUserID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (s *Store) CountUsers(ctx context.Context) (int, error) {
 	var n int
 	return n, s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n)
