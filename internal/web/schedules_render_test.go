@@ -64,3 +64,33 @@ func TestSchedulesContentRenders(t *testing.T) {
 		}
 	}
 }
+
+// TestPresetTbodyRenders guards the preset auto-refresh fragment: the
+// preset-tbody partial must render rows with the delete action wired to a
+// tbody refresh (not a row-level swap or page reload).
+func TestPresetTbodyRenders(t *testing.T) {
+	tmpl := template.Must(template.New("").Funcs(templateFuncs).ParseFS(embeddedFS,
+		"templates/layout.html", "templates/partials.html", "templates/presets.html",
+	))
+	data := PresetsData{Presets: []PresetView{
+		{ID: "p1", Label: "Weekday mornings", Expression: "0 8 * * 1-5", Category: "Custom"},
+		{ID: "p2", Label: "Hourly", Expression: "0 * * * *", Category: "Common"},
+	}}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "preset-tbody", data); err != nil {
+		t.Fatalf("render preset-tbody: %v", err)
+	}
+	out := buf.String()
+
+	if !strings.Contains(out, "0 8 * * 1-5") {
+		t.Errorf("preset-tbody missing custom preset expression")
+	}
+	if !strings.Contains(out, "htmx.trigger('#preset-tbody','refreshList')") {
+		t.Errorf("custom preset delete should trigger a tbody refresh")
+	}
+	// Embedded (non-Custom) presets must not be deletable.
+	if strings.Contains(out, "Delete preset 'Hourly'") {
+		t.Errorf("embedded preset should not have a delete button")
+	}
+}

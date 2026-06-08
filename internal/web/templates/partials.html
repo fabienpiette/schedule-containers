@@ -159,3 +159,27 @@
 <tr><td colspan="6" class="empty-cell">No stack schedules yet.</td></tr>
 {{end}}
 {{end}}
+
+{{define "preset-row"}}
+<tr class="data-row" id="preset-{{.ID}}">
+    <td class="cell-name">{{.Label}}</td>
+    <td><span class="cron">{{.Expression}}</span></td>
+    <td><span class="badge badge-tag">{{.Category}}</span></td>
+    <td class="muted">{{.Description}}</td>
+    <td class="cell-actions">
+        {{if eq .Category "Custom"}}
+        <button class="act-btn act-danger" title="Delete" onclick="showConfirm('Delete Preset','Delete preset \'{{.Label}}\'?',function(){htmx.ajax('DELETE','/api/presets/{{.ID}}').then(function(){htmx.trigger('#preset-tbody','refreshList')})})">Delete</button>
+        {{else}}
+        <span class="muted">Embedded</span>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+
+{{define "preset-tbody"}}
+{{range .Presets}}
+{{template "preset-row" .}}
+{{else}}
+<tr><td colspan="5" class="empty-cell">No presets found.</td></tr>
+{{end}}
+{{end}}

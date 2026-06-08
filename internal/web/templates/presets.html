@@ -40,22 +40,8 @@
             <th>Actions</th>
         </tr>
     </thead>
-    <tbody>
-        {{range .Presets}}
-        <tr class="data-row" id="preset-{{.ID}}">
-            <td>{{.Label}}</td>
-            <td><span class="cron">{{.Expression}}</span></td>
-            <td><span class="badge badge-tag">{{.Category}}</span></td>
-            <td class="muted">{{.Description}}</td>
-            <td class="cell-actions">
-                {{if eq .Category "Custom"}}
-                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Preset','Delete preset \'{{.Label}}\'?',function(){htmx.ajax('DELETE','/api/presets/{{.ID}}',{target:'#preset-{{.ID}}',swap:'outerHTML'})})">Delete</button>
-                {{else}}
-                <span class="muted">Embedded</span>
-                {{end}}
-            </td>
-        </tr>
-        {{end}}
+    <tbody id="preset-tbody" hx-get="/api/presets" hx-trigger="refreshList" hx-swap="innerHTML">
+        {{template "preset-tbody" .}}
     </tbody>
 </table>
 {{else}}
@@ -81,7 +67,9 @@ document.getElementById('preset-form').addEventListener('submit', function(e) {
     }).then(function(r) {
         if (r.ok) {
             showToast('Preset created');
-            window.location.reload();
+            document.getElementById('preset-dialog').close();
+            document.getElementById('preset-form').reset();
+            htmx.trigger('#preset-tbody', 'refreshList');
         } else {
             return r.text().then(function(t) { throw new Error(t); });
         }

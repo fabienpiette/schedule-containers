@@ -383,6 +383,22 @@ func (s *Server) apiStopContainer(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiListPresets(w http.ResponseWriter, r *http.Request) {
 	presets := s.presetService.List()
 
+	if wantsHTML(r) {
+		views := make([]PresetView, len(presets))
+		for i, p := range presets {
+			views[i] = PresetView{
+				ID:          p.ID,
+				Label:       p.Label,
+				Expression:  p.Expression,
+				Category:    p.Category,
+				Description: p.Description,
+			}
+		}
+		w.Header().Set("Content-Type", "text/html")
+		s.renderPartial(w, "preset-tbody", PresetsData{Presets: views})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(presets)
 }
