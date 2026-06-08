@@ -724,3 +724,204 @@ small { color: var(--text-secondary); }
 .table-search::placeholder {
     color: var(--text-secondary);
 }
+
+/* ── Schedules: slim stat strip ───────────────────────────── */
+.stat-strip {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0.6rem 1rem;
+    margin-bottom: 1.5rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: fit-content;
+}
+.stat-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+}
+.stat-num {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1;
+}
+.stat-cap {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+}
+.stat-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    align-self: center;
+}
+.stat-dot-on { background: var(--success); box-shadow: 0 0 0 3px var(--success-subtle); }
+.stat-dot-off { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-subtle); }
+.stat-sep {
+    width: 1px;
+    align-self: stretch;
+    background: var(--border);
+}
+
+/* ── Schedules: tab bar + segmented tabs ──────────────────── */
+.sched-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.seg-tabs {
+    display: inline-flex;
+    padding: 3px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    gap: 2px;
+}
+.seg-tab {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.4rem 1.1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: color 0.12s, background 0.12s;
+}
+.seg-tab:hover { color: var(--text-primary); }
+.seg-tab.active {
+    background: var(--accent);
+    color: #fff;
+}
+.btn-plus { font-weight: 600; margin-right: 0.15rem; }
+
+.tab-panel { animation: panel-fade 0.18s ease; }
+@keyframes panel-fade {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── Schedules: schedule cell (human + raw cron) ──────────── */
+.cell-sched { min-width: 230px; }
+.sched-human {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.sched-on { font-weight: 500; }
+.sched-on::before {
+    content: "";
+    display: inline-block;
+    width: 0; height: 0;
+    border-left: 6px solid var(--success);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    margin-right: 0.4rem;
+    vertical-align: 0.5px;
+}
+.sched-off { font-weight: 500; }
+.sched-off::before {
+    content: "";
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 1px;
+    background: var(--danger);
+    margin-right: 0.4rem;
+    vertical-align: 0.5px;
+}
+.sched-sep { color: var(--text-secondary); }
+.sched-raw {
+    margin-top: 0.2rem;
+    display: flex;
+    gap: 0.3rem;
+    opacity: 0.65;
+}
+.sched-raw .cron { font-size: 0.7rem; padding: 0.05rem 0.3rem; }
+
+/* ── Schedules: trigger column ────────────────────────────── */
+.cell-trigger {
+    display: table-cell;
+}
+.cell-trigger .badge { margin-right: 0.3rem; }
+
+/* ── Schedules: status pill ───────────────────────────────── */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.status-pill .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+.status-on { color: var(--text-primary); }
+.status-on .status-dot { background: var(--success); box-shadow: 0 0 0 3px var(--success-subtle); }
+.status-off .status-dot { background: var(--text-secondary); }
+
+.count-pill {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.cell-subtle {
+    display: block;
+    font-family: Inter, system-ui, sans-serif;
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.1rem;
+}
+.empty-cell {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem 0.75rem !important;
+}
+
+/* ── Schedules: hover-reveal row actions ──────────────────── */
+.col-actions { width: 1%; }
+.cell-actions { text-align: right; white-space: nowrap; }
+.act-btn {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.25rem 0.55rem;
+    border-radius: 5px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s, background 0.12s, color 0.12s, border-color 0.12s;
+}
+.data-row:hover .act-btn,
+.data-row:focus-within .act-btn { opacity: 1; }
+.act-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-base);
+    border-color: var(--border);
+}
+.act-danger:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: var(--danger-subtle);
+}
+/* Keep actions reachable on touch devices that lack hover */
+@media (hover: none) {
+    .act-btn { opacity: 1; }
+}

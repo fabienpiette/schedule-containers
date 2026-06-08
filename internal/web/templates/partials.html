@@ -1,15 +1,34 @@
 {{define "schedule-row"}}
 <tr class="data-row" id="schedule-{{.ID}}">
-    <td class="cell-name">{{.DisplayName}}</td>
-    <td class="muted">{{.StackName}}{{if .StackScheduleName}} <span class="badge badge-info" title="Managed by stack schedule">Stack: {{.StackScheduleName}}</span>{{end}}</td>
-    <td><span class="cron">{{.StartCron}}</span> <span class="arrow">&rarr;</span> <span class="cron">{{.StopCron}}</span></td>
-    <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}</span>{{else}}<span class="muted">-</span>{{end}}</td>
-    <td>{{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{else}}<span class="muted">-</span>{{end}}</td>
-    <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
+    <td class="cell-name">
+        {{.DisplayName}}
+        {{if .StackScheduleName}}<span class="badge badge-info" title="Managed by stack schedule">stack: {{.StackScheduleName}}</span>{{end}}
+    </td>
+    <td class="cell-sched">
+        {{if or .StartCron .StopCron}}
+        <div class="sched-human">
+            <span class="sched-on" title="Starts">{{humanCron .StartCron}}</span>
+            <span class="sched-sep">&rarr;</span>
+            <span class="sched-off" title="Stops">{{humanCron .StopCron}}</span>
+        </div>
+        <div class="sched-raw"><span class="cron">{{.StartCron}}</span> <span class="cron">{{.StopCron}}</span></div>
+        {{else}}
+        <span class="muted">&mdash;</span>
+        {{end}}
+    </td>
+    <td class="cell-trigger">
+        {{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{end}}
+        {{if .TagName}}<span class="badge badge-tag">{{.TagName}}</span>{{end}}
+        {{if and (not .OnDemandEnabled) (not .TagName)}}<span class="muted">&mdash;</span>{{end}}
+    </td>
+    <td>
+        {{if .Enabled}}<span class="status-pill status-on"><span class="status-dot"></span>Enabled</span>
+        {{else}}<span class="status-pill status-off"><span class="status-dot"></span>Disabled</span>{{end}}
+    </td>
     <td class="cell-actions">
-        <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-        <button class="btn-ghost btn-sm" onclick="editSchedule('{{.ID}}')">Edit</button>
-        <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-tbody','refreshList')})})">Delete</button>
+        <button class="act-btn" title="{{if .Enabled}}Disable{{else}}Enable{{end}}" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+        <button class="act-btn" title="Edit" onclick="editSchedule('{{.ID}}')">Edit</button>
+        <button class="act-btn act-danger" title="Delete" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-tbody','refreshList')})})">Delete</button>
     </td>
 </tr>
 {{end}}
@@ -45,7 +64,7 @@
 {{range .Schedules}}
 {{template "schedule-row" .}}
 {{else}}
-<tr><td colspan="7" class="muted">No schedules configured</td></tr>
+<tr><td colspan="5" class="empty-cell">No container schedules yet.</td></tr>
 {{end}}
 {{end}}
 
@@ -92,17 +111,34 @@
 
 {{define "stack-row"}}
 <tr class="data-row" id="stack-{{.ID}}">
-    <td class="cell-name">{{.Name}}</td>
-    <td>{{.DisplayName}}</td>
-    <td>{{if .StartCron}}<span class="cron">{{.StartCron}}</span>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
-    <td>{{if .StopCron}}<span class="cron">{{.StopCron}}</span>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
-    <td>{{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
-    <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
-    <td>{{.ContainerCount}} containers</td>
+    <td class="cell-name">
+        {{.Name}}
+        {{if .DisplayName}}<span class="cell-subtle">{{.DisplayName}}</span>{{end}}
+    </td>
+    <td class="cell-sched">
+        {{if or .StartCron .StopCron}}
+        <div class="sched-human">
+            <span class="sched-on" title="Starts">{{humanCron .StartCron}}</span>
+            <span class="sched-sep">&rarr;</span>
+            <span class="sched-off" title="Stops">{{humanCron .StopCron}}</span>
+        </div>
+        <div class="sched-raw"><span class="cron">{{.StartCron}}</span> <span class="cron">{{.StopCron}}</span></div>
+        {{else}}
+        <span class="muted">&mdash;</span>
+        {{end}}
+    </td>
+    <td class="cell-trigger">
+        {{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{else}}<span class="muted">&mdash;</span>{{end}}
+    </td>
+    <td><span class="count-pill">{{.ContainerCount}}</span></td>
+    <td>
+        {{if .Enabled}}<span class="status-pill status-on"><span class="status-dot"></span>Enabled</span>
+        {{else}}<span class="status-pill status-off"><span class="status-dot"></span>Disabled</span>{{end}}
+    </td>
     <td class="cell-actions">
-        <button class="btn-ghost btn-sm" hx-post="/api/stacks/{{.ID}}/toggle" hx-target="#stack-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-        <button class="btn-ghost btn-sm" onclick="editStack('{{.ID}}')">Edit</button>
-        <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-tbody','refreshList')})})">Delete</button>
+        <button class="act-btn" title="{{if .Enabled}}Disable{{else}}Enable{{end}}" hx-post="/api/stacks/{{.ID}}/toggle" hx-target="#stack-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+        <button class="act-btn" title="Edit" onclick="editStack('{{.ID}}')">Edit</button>
+        <button class="act-btn act-danger" title="Delete" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-tbody','refreshList')})})">Delete</button>
     </td>
 </tr>
 {{end}}
@@ -111,6 +147,6 @@
 {{range .Stacks}}
 {{template "stack-row" .}}
 {{else}}
-<tr><td colspan="8" class="muted">No stack schedules configured</td></tr>
+<tr><td colspan="6" class="empty-cell">No stack schedules yet.</td></tr>
 {{end}}
 {{end}}

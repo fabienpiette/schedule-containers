@@ -1,23 +1,24 @@
 {{template "layout" .}}
 
 {{define "content"}}
-<div class="stat-cards">
-    <div class="stat-card">
-        <div class="stat-label">Running</div>
-        <div class="stat-value stat-success">{{.RunningCount}}</div>
+<div class="stat-strip">
+    <div class="stat-item">
+        <span class="stat-dot stat-dot-on"></span>
+        <span class="stat-num">{{.RunningCount}}</span>
+        <span class="stat-cap">running</span>
     </div>
-    <div class="stat-card">
-        <div class="stat-label">Stopped</div>
-        <div class="stat-value stat-danger">{{.StoppedCount}}</div>
+    <div class="stat-sep"></div>
+    <div class="stat-item">
+        <span class="stat-dot stat-dot-off"></span>
+        <span class="stat-num">{{.StoppedCount}}</span>
+        <span class="stat-cap">stopped</span>
     </div>
-    <div class="stat-card">
-        <div class="stat-label">Schedules</div>
-        <div class="stat-value">{{.SchedulesCount}}</div>
+    <div class="stat-sep"></div>
+    <div class="stat-item">
+        <span class="stat-num">{{.SchedulesCount}}</span>
+        <span class="stat-cap">schedules</span>
     </div>
 </div>
-<h1>Schedules</h1>
-
-<button class="btn-primary" onclick="document.getElementById('schedule-dialog').showModal()">Create Schedule</button>
 
 <dialog id="schedule-dialog" class="dialog-card">
   <div class="mode-toggle">
@@ -202,77 +203,52 @@
   </div>
 </dialog>
 
-<h2>Container Schedules</h2>
-<input type="text" id="schedule-search" class="table-search" placeholder="Search schedules...">
-<table class="data-table" id="schedule-table">
-    <thead>
-        <tr>
-            <th data-sort="container">Container</th>
-            <th data-sort="stack">Stack</th>
-            <th data-sort="schedule">Schedule</th>
-            <th data-sort="tag">Tag</th>
-            <th data-sort="ondemand">On-Demand</th>
-            <th data-sort="status">Status</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody id="schedule-tbody" hx-get="/api/schedules" hx-trigger="refreshList" hx-swap="innerHTML">
-        {{range .Schedules}}
-        <tr class="data-row" id="schedule-{{.ID}}">
-            <td class="cell-name">{{.DisplayName}}</td>
-            <td class="muted">{{.StackName}}{{if .StackScheduleName}} <span class="badge badge-info" title="Managed by stack schedule">Stack: {{.StackScheduleName}}</span>{{end}}</td>
-            <td><span class="cron">{{.StartCron}}</span> <span class="arrow">&rarr;</span> <span class="cron">{{.StopCron}}</span></td>
-            <td>{{if .TagName}}<span class="badge badge-tag">{{.TagName}}</span>{{else}}<span class="muted">-</span>{{end}}</td>
-            <td>{{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{else}}<span class="muted">-</span>{{end}}</td>
-            <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
-            <td class="cell-actions">
-                <button class="btn-ghost btn-sm" hx-post="/api/schedules/{{.ID}}/toggle" hx-target="#schedule-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-                <button class="btn-ghost btn-sm" onclick="editSchedule('{{.ID}}')">Edit</button>
-                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Schedule','Remove schedule for {{.DisplayName}}?',function(){htmx.ajax('DELETE','/api/schedules/{{.ID}}').then(function(){htmx.trigger('#schedule-tbody','refreshList')})})">Delete</button>
-            </td>
-        </tr>
-        {{else}}
-        <tr><td colspan="7" class="muted">No schedules configured</td></tr>
-        {{end}}
-    </tbody>
-</table>
+<div class="sched-head">
+    <div class="seg-tabs" role="tablist">
+        <button class="seg-tab active" id="seg-containers" role="tab" type="button" onclick="switchTab('containers')">Containers</button>
+        <button class="seg-tab" id="seg-stacks" role="tab" type="button" onclick="switchTab('stacks')">Stacks</button>
+    </div>
+    <button class="btn-primary" type="button" onclick="openCreateDialog()">
+        <span class="btn-plus">+</span> New schedule
+    </button>
+</div>
 
-<h2>Stack Schedules</h2>
-<input type="text" id="stack-search" class="table-search" placeholder="Search stacks...">
-<table class="data-table" id="stack-table">
-    <thead>
-        <tr>
-            <th data-sort="name">Project Name</th>
-            <th data-sort="display">Display Name</th>
-            <th data-sort="start">Start Cron</th>
-            <th data-sort="stop">Stop Cron</th>
-            <th data-sort="ondemand">On-Demand</th>
-            <th data-sort="status">Status</th>
-            <th>Containers</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody id="stack-tbody" hx-get="/api/stacks" hx-trigger="refreshList" hx-swap="innerHTML">
-        {{range .Stacks}}
-        <tr class="data-row" id="stack-{{.ID}}">
-            <td class="cell-name">{{.Name}}</td>
-            <td>{{.DisplayName}}</td>
-            <td>{{if .StartCron}}<span class="cron">{{.StartCron}}</span>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
-            <td>{{if .StopCron}}<span class="cron">{{.StopCron}}</span>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
-            <td>{{if .OnDemandEnabled}}<span class="badge badge-info">On-Demand</span>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
-            <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
-            <td>{{.ContainerCount}} containers</td>
-            <td class="cell-actions">
-                <button class="btn-ghost btn-sm" hx-post="/api/stacks/{{.ID}}/toggle" hx-target="#stack-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-                <button class="btn-ghost btn-sm" onclick="editStack('{{.ID}}')">Edit</button>
-                <button class="btn-ghost btn-sm btn-danger-text" onclick="showConfirm('Delete Stack','Delete stack schedule for \'{{.Name}}\'?',function(){htmx.ajax('DELETE','/api/stacks/{{.ID}}').then(function(){htmx.trigger('#stack-tbody','refreshList')})})">Delete</button>
-            </td>
-        </tr>
-        {{else}}
-        <tr><td colspan="8" class="muted">No stack schedules configured</td></tr>
-        {{end}}
-    </tbody>
-</table>
+<div class="tab-panel" id="panel-containers" role="tabpanel">
+    <input type="text" id="schedule-search" class="table-search" placeholder="Search containers&hellip;">
+    <table class="data-table" id="schedule-table">
+        <thead>
+            <tr>
+                <th data-sort="container">Container</th>
+                <th data-sort="schedule">Schedule</th>
+                <th data-sort="trigger">Trigger</th>
+                <th data-sort="status">Status</th>
+                <th class="col-actions"></th>
+            </tr>
+        </thead>
+        <tbody id="schedule-tbody" hx-get="/api/schedules" hx-trigger="refreshList" hx-swap="innerHTML">
+            {{template "schedule-tbody" .}}
+        </tbody>
+    </table>
+</div>
+
+<div class="tab-panel" id="panel-stacks" role="tabpanel" hidden>
+    <input type="text" id="stack-search" class="table-search" placeholder="Search stacks&hellip;">
+    <table class="data-table" id="stack-table">
+        <thead>
+            <tr>
+                <th data-sort="name">Project</th>
+                <th data-sort="schedule">Schedule</th>
+                <th data-sort="ondemand">On-Demand</th>
+                <th data-sort="count">Containers</th>
+                <th data-sort="status">Status</th>
+                <th class="col-actions"></th>
+            </tr>
+        </thead>
+        <tbody id="stack-tbody" hx-get="/api/stacks" hx-trigger="refreshList" hx-swap="innerHTML">
+            {{template "stack-tbody" .}}
+        </tbody>
+    </table>
+</div>
 {{end}}
 
 {{define "scripts"}}
@@ -293,6 +269,23 @@ fetch('/api/containers').then(function(r){return r.json();}).then(function(conta
         sortSelectOptions(sel);
     }
 });
+
+var activeTab = currentMode === 'stack' ? 'stacks' : 'containers';
+
+function switchTab(tab) {
+    activeTab = tab;
+    document.getElementById('panel-containers').hidden = (tab !== 'containers');
+    document.getElementById('panel-stacks').hidden = (tab !== 'stacks');
+    document.getElementById('seg-containers').classList.toggle('active', tab === 'containers');
+    document.getElementById('seg-stacks').classList.toggle('active', tab === 'stacks');
+}
+
+function openCreateDialog() {
+    switchMode(activeTab === 'stacks' ? 'stack' : 'container');
+    document.getElementById('schedule-dialog').showModal();
+}
+
+switchTab(activeTab);
 
 if (currentMode === 'stack') {
     document.getElementById('schedule-dialog').showModal();

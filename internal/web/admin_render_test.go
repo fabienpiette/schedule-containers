@@ -12,7 +12,7 @@ import (
 
 func adminTemplate(t *testing.T) *template.Template {
 	t.Helper()
-	return template.Must(template.New("").ParseFS(embeddedFS,
+	return template.Must(template.New("").Funcs(templateFuncs).ParseFS(embeddedFS,
 		"templates/layout.html",
 		"templates/partials.html",
 		"templates/admin_users.html",

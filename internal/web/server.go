@@ -82,7 +82,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 	templates := make(map[string]*template.Template)
 	for name, pageFile := range pages {
 		files := append(baseFiles, pageFile)
-		templates[name] = template.Must(template.New("").ParseFS(embeddedFS, files...))
+		templates[name] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(embeddedFS, files...))
 	}
 
 	wakeContent, _ := embeddedFS.ReadFile("templates/wake.html")
