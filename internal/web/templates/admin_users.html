@@ -31,7 +31,7 @@
 
 {{template "users-table" .}}
 
-<div id="link-oidc-modal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
+<div id="link-oidc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:50;">
     <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;max-width:400px;width:100%;">
         <h3 style="margin:0 0 1rem;">Link OIDC Account</h3>
         <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:1rem;">Select the OIDC account to merge into this local account. The OIDC account will be deleted and its identity transferred.</p>
@@ -51,10 +51,10 @@ let linkTargetId = '';
 function openLinkModal(targetId) {
     linkTargetId = targetId;
     document.getElementById('link-oidc-error').style.display = 'none';
-    document.getElementById('link-oidc-modal').hidden = false;
+    document.getElementById('link-oidc-modal').style.display = 'flex';
 }
 function closeLinkModal() {
-    document.getElementById('link-oidc-modal').hidden = true;
+    document.getElementById('link-oidc-modal').style.display = 'none';
 }
 function confirmLink() {
     const sourceId = document.getElementById('link-oidc-source').value;
