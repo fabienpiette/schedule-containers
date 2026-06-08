@@ -879,6 +879,17 @@ small { color: var(--text-secondary); }
     font-size: 0.8rem;
     color: var(--text-secondary);
 }
+.link-count {
+    appearance: none;
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.link-count:hover { color: var(--text-primary); }
+.link-count:hover .count-pill { color: var(--accent); }
 .cell-subtle {
     display: block;
     font-family: Inter, system-ui, sans-serif;

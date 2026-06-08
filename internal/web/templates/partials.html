@@ -36,13 +36,22 @@
 {{define "tag-row"}}
 <tr class="data-row" id="tag-{{.ID}}">
     <td class="cell-name">{{.Name}}</td>
-    <td><span class="cron">{{.StartCron}}</span></td>
-    <td><span class="cron">{{.StopCron}}</span></td>
-    <td>{{if .Enabled}}<span class="badge badge-success">Enabled</span>{{else}}<span class="badge badge-danger">Disabled</span>{{end}}</td>
-    <td>{{.ContainerCount}}</td>
+    <td class="cell-sched">
+        <div class="sched-human">
+            <span class="sched-on" title="Starts">{{humanCron .StartCron}}</span>
+            <span class="sched-sep">&rarr;</span>
+            <span class="sched-off" title="Stops">{{humanCron .StopCron}}</span>
+        </div>
+        <div class="sched-raw"><span class="cron">{{.StartCron}}</span> <span class="cron">{{.StopCron}}</span></div>
+    </td>
+    <td>
+        {{if .Enabled}}<span class="status-pill status-on"><span class="status-dot"></span>Enabled</span>
+        {{else}}<span class="status-pill status-off"><span class="status-dot"></span>Disabled</span>{{end}}
+    </td>
+    <td><button class="link-count" onclick="toggleTagContainers('{{.ID}}')"><span class="count-pill">{{.ContainerCount}}</span> containers</button></td>
     <td class="cell-actions">
-        <button class="btn-ghost btn-sm" hx-post="/api/tags/{{.ID}}/toggle" hx-target="#tag-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
-        <button class="btn-danger-text btn-sm" onclick="showConfirm('Delete Tag','Remove tag {{.Name}} and its schedules?',function(){htmx.ajax('DELETE','/api/tags/{{.ID}}').then(function(){htmx.trigger('#tag-tbody','refreshList')})})">Delete</button>
+        <button class="act-btn" title="{{if .Enabled}}Disable{{else}}Enable{{end}}" hx-post="/api/tags/{{.ID}}/toggle" hx-target="#tag-{{.ID}}" hx-swap="outerHTML">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+        <button class="act-btn act-danger" title="Delete" onclick="showConfirm('Delete Tag','Remove tag {{.Name}} and its schedules?',function(){htmx.ajax('DELETE','/api/tags/{{.ID}}').then(function(){htmx.trigger('#tag-tbody','refreshList')})})">Delete</button>
     </td>
 </tr>
 {{end}}
@@ -72,7 +81,7 @@
 {{range .Tags}}
 {{template "tag-row" .}}
 <tr id="tag-{{.ID}}-detail" class="tag-detail-row" style="display:none;">
-    <td colspan="6">
+    <td colspan="5">
         <div class="tag-detail">
             <div class="tag-containers-list">
                 <strong>Containers:</strong>
@@ -97,7 +106,7 @@
     </td>
 </tr>
 {{else}}
-<tr><td colspan="6" class="muted">No tags configured. Create one to get started.</td></tr>
+<tr><td colspan="5" class="empty-cell">No tags configured. Create one to get started.</td></tr>
 {{end}}
 {{end}}
 
