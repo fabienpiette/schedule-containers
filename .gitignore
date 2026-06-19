@@ -1,10 +1,22 @@
+# Build artifacts
 schedule-containers
 bin/
-*.db
+*.test
 *.out
 coverage.html
-.env
 vendor/
-*.test
 tmp/
+
+# Local runtime data
+*.db
+.env
+presets.yaml
+
+# Local tooling and notes (kept locally, not published)
+.serena/
+.claude/
 .superpowers/
+CLAUDE.md
+opencode.json
+docs/superpowers/
+session-*.md

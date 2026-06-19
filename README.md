@@ -122,7 +122,7 @@ OIDC is disabled unless all four `OIDC_*` variables are set. When enabled, the l
 
 ## Contributing
 
-Contributions welcome — open an issue or pull request. See [Architecture](docs/ARCHITECTURE.md) for codebase orientation and [CLAUDE.md](CLAUDE.md) for development commands.
+Contributions welcome — open an issue or pull request. See [Architecture](docs/ARCHITECTURE.md) for codebase orientation; `make build`, `make test`, and `make vet` cover the common development tasks.
 
 ## Acknowledgments
 
