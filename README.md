@@ -34,7 +34,7 @@ docker compose up -d
 docker compose up -d
 ```
 
-Push to your own registry with `make docker-release`.
+Push to your own registry with `make docker-release`. Deploying with Portainer? See [`examples/portainer/`](examples/portainer/).
 
 ### From source
 

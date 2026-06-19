@@ -1,0 +1,41 @@
+# Ready-to-use Portainer stack for schedule-containers.
+#
+# Deploy in Portainer:
+#   Stacks -> Add stack -> Web editor -> paste this file -> Deploy the stack
+#   Optionally set HOST_PORT / TZ / LOG_LEVEL / OIDC_* under "Environment variables".
+#
+# Prerequisites:
+#   - The image below must be pullable: cut a release tag so it is published to
+#     GHCR and set the package to Public, OR add registry credentials in
+#     Portainer (Registries) for a private pull.
+#   - The host's Docker socket must exist at /var/run/docker.sock.
+
+services:
+  schedule-containers:
+    image: ghcr.io/fabienpiette/schedule-containers:latest
+    container_name: schedule-containers
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      DB_PATH: /data/schedule-containers.db
+      PRESETS_PATH: /data/presets.yaml
+      WEB_PORT: "8080"
+      WEB_HOST: 0.0.0.0
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: ${TZ:-UTC}
+      # OIDC login (optional) — set all four to enable, leave empty to disable.
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URL: ${OIDC_REDIRECT_URL:-}
+    volumes:
+      # Direct socket access is privileged (full control of the host's
+      # containers). For a hardened setup, front it with a socket proxy and
+      # point DOCKER_HOST at the proxy instead — see SECURITY.md.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - schedule-containers-data:/data
+    restart: unless-stopped
+
+volumes:
+  schedule-containers-data:
