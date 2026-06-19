@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="schedule-containers" width="120">
+</p>
+
 <h3 align="center">Schedule Docker containers on cron — start, stop, or wake on demand.<br>Stacks, auth, and a dashboard. Single binary, no dependencies.</h3>
 
 <p align="center">
