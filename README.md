@@ -20,6 +20,10 @@ docker compose up -d
 - **Authentication** — Login, sessions, and three roles (reader, writer, admin). First run prompts for admin setup. OIDC login via Pocket ID or any OpenID Connect provider
 - **Tags** — Reusable schedule templates applied to multiple containers at once
 
+## License
+
+[AGPL-3.0](LICENSE) — a network-copyleft license: if you run a modified version as a network service, you must offer its users the source.
+
 ## Install
 
 **Prerequisites:** Docker (runtime), Go 1.25+ (build from source)
@@ -127,7 +131,3 @@ Contributions welcome — open an issue or pull request. See [Architecture](docs
 ## Acknowledgments
 
 Thanks to all [contributors](https://github.com/fabienpiette/schedule-containers/graphs/contributors).
-
-## License
-
-[AGPL-3.0](LICENSE)
