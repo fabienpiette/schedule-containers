@@ -1,4 +1,4 @@
-<h3 align="center">Schedule Docker container start/stop with cron expressions.<br>Stacks, on-demand wake, role-based auth, OIDC login. Single binary. No dependencies.</h3>
+<h3 align="center">Schedule Docker containers on cron — start, stop, or wake on demand.<br>Stacks, auth, and a dashboard. Single binary, no dependencies.</h3>
 
 <p align="center">
   <img src="docs/demo.gif" alt="Demo" width="600">
@@ -14,11 +14,10 @@ docker compose up -d
 ## Features
 
 - **Cron scheduling** — Start and stop containers on any 5-field cron expression (`0 8 * * 1-5` = weekdays at 8am)
-- **Stacks** — Schedule groups of containers (Docker Compose stacks) together with shared cron expressions and on-demand wake
-- **On-demand wake** — Wake stopped containers on access via `/wake/<container>/`, auto-redirect when healthy
+- **Stacks** — Schedule groups of containers together with shared cron expressions and on-demand wake
+- **On-demand wake** — Wake stopped containers via `/wake/<container>/`, auto-redirect when healthy
 - **Inactivity auto-stop** — Stop containers after configurable idle timeout (monitors CPU and network activity)
-- **Role-based auth** — Login, sessions, and three roles (reader, writer, admin). First run prompts for admin setup
-- **OIDC login** — Authenticate via Pocket ID or any OpenID Connect provider alongside local passwords
+- **Authentication** — Login, sessions, and three roles (reader, writer, admin). First run prompts for admin setup. OIDC login via Pocket ID or any OpenID Connect provider
 - **Tags** — Reusable schedule templates applied to multiple containers at once
 
 ## Install
@@ -56,7 +55,7 @@ schedule-containers schedule import schedules.yaml --dry-run        # Import (dr
 
 ### On-Demand Wake
 
-Configure a Caddy reverse proxy to redirect to the wake URL when the upstream is down:
+Configure a reverse proxy to redirect to the wake URL when the upstream is down:
 
 ```caddy
 app.example.com {
