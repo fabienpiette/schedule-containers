@@ -49,8 +49,8 @@ func (m *mockOnDemandService) CheckStackHealth(ctx context.Context, name string)
 	return m.stackHealthResult, m.stackHealthError
 }
 
-func (m *mockOnDemandService) AddStack(stack *models.Stack)    {}
-func (m *mockOnDemandService) RemoveStack(stackID string) {}
+func (m *mockOnDemandService) AddStack(stack *models.Stack) {}
+func (m *mockOnDemandService) RemoveStack(stackID string)   {}
 
 func (m *mockOnDemandService) Watch(schedule *models.Schedule) {
 	m.watched = append(m.watched, schedule)

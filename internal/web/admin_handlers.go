@@ -6,9 +6,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/fabienpiette/schedule-containers/internal/auth"
 	"github.com/fabienpiette/schedule-containers/internal/models"
+	"github.com/go-chi/chi/v5"
 )
 
 type adminUsersData struct {

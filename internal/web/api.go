@@ -310,12 +310,12 @@ func (s *Server) apiToggleSchedule(w http.ResponseWriter, r *http.Request) {
 		}
 		sv := ScheduleView{
 			ID:                toggled.ID,
-			ContainerName:    toggled.ContainerName,
+			ContainerName:     toggled.ContainerName,
 			DisplayName:       toggled.DisplayName,
 			StackName:         toggled.StackName,
 			StackScheduleName: stackScheduleName,
-			StartCron:        toggled.StartCron,
-			StopCron:         toggled.StopCron,
+			StartCron:         toggled.StartCron,
+			StopCron:          toggled.StopCron,
 			Enabled:           toggled.Enabled,
 			OnDemandEnabled:   toggled.OnDemandEnabled,
 			OnDemandURL:       toggled.OnDemandURL,

@@ -16,26 +16,24 @@ import (
 	"github.com/fabienpiette/schedule-containers/internal/ondemand"
 )
 
-
-
 type PageBase struct {
 	CurrentUser *models.User
 }
 
 type ScheduleView struct {
-	ID               string
-	ContainerName    string
-	DisplayName      string
-	StackName        string
+	ID                string
+	ContainerName     string
+	DisplayName       string
+	StackName         string
 	StackScheduleName string
-	StartCron        string
-	StopCron         string
-	Enabled          bool
-	OnDemandEnabled  bool
-	OnDemandURL      string
-	IdleTimeoutSec   int
-	StartupDelaySec  int
-	TagName          string
+	StartCron         string
+	StopCron          string
+	Enabled           bool
+	OnDemandEnabled   bool
+	OnDemandURL       string
+	IdleTimeoutSec    int
+	StartupDelaySec   int
+	TagName           string
 }
 
 type WakeData struct {
@@ -155,17 +153,17 @@ func buildScheduleViews(schedules []models.Schedule, tagCache map[string]string,
 	views := make([]ScheduleView, len(schedules))
 	for i, sched := range schedules {
 		sv := ScheduleView{
-			ID:               sched.ID,
-			ContainerName:    sched.ContainerName,
-			DisplayName:      sched.DisplayName,
-			StackName:        sched.StackName,
-			StartCron:        sched.StartCron,
-			StopCron:         sched.StopCron,
-			Enabled:          sched.Enabled,
-			OnDemandEnabled:  sched.OnDemandEnabled,
-			OnDemandURL:      sched.OnDemandURL,
-			IdleTimeoutSec:   sched.IdleTimeoutSec,
-			StartupDelaySec:  sched.StartupDelaySec,
+			ID:              sched.ID,
+			ContainerName:   sched.ContainerName,
+			DisplayName:     sched.DisplayName,
+			StackName:       sched.StackName,
+			StartCron:       sched.StartCron,
+			StopCron:        sched.StopCron,
+			Enabled:         sched.Enabled,
+			OnDemandEnabled: sched.OnDemandEnabled,
+			OnDemandURL:     sched.OnDemandURL,
+			IdleTimeoutSec:  sched.IdleTimeoutSec,
+			StartupDelaySec: sched.StartupDelaySec,
 		}
 		if sched.TagID != nil {
 			sv.TagName = tagCache[*sched.TagID]
@@ -230,8 +228,6 @@ func (s *Server) buildSingleContainerView(ctx context.Context, ctr *models.Conta
 		TagID:          tagID,
 	}
 }
-
-
 
 func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 	containers, _ := s.docker.ListContainers(r.Context())

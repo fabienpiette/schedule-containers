@@ -97,9 +97,9 @@ var scheduleAddCmd = &cobra.Command{
 		schedule := &models.Schedule{
 			ContainerName: args[0],
 			DisplayName:   displayName,
-			StartCron:      args[1],
-			StopCron:       args[2],
-			Enabled:        true,
+			StartCron:     args[1],
+			StopCron:      args[2],
+			Enabled:       true,
 		}
 
 		created, err := db.CreateSchedule(context.Background(), schedule)

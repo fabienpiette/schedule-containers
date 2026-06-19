@@ -44,8 +44,8 @@ type OnDemandManager struct {
 	wakeMu        map[string]*sync.Mutex
 	trackers      map[string]*idleTracker
 	schedules     map[string]*models.Schedule
-	stacks        map[string]*models.Stack  // keyed by stack Name (compose project)
-	stackTrackers map[string]*idleTracker   // keyed by stack ID
+	stacks        map[string]*models.Stack // keyed by stack Name (compose project)
+	stackTrackers map[string]*idleTracker  // keyed by stack ID
 	cancel        context.CancelFunc
 }
 

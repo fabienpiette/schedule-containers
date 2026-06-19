@@ -26,11 +26,11 @@ type ScheduleEntry struct {
 }
 
 type TagEntry struct {
-	Name        string   `yaml:"name"`
-	StartCron   string   `yaml:"start_cron"`
-	StopCron    string   `yaml:"stop_cron"`
-	Enabled     bool     `yaml:"enabled"`
-	Containers  []string `yaml:"containers"`
+	Name       string   `yaml:"name"`
+	StartCron  string   `yaml:"start_cron"`
+	StopCron   string   `yaml:"stop_cron"`
+	Enabled    bool     `yaml:"enabled"`
+	Containers []string `yaml:"containers"`
 }
 
 type StackEntry struct {

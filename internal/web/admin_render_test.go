@@ -57,7 +57,7 @@ func TestLinkModalHiddenByDefault(t *testing.T) {
 	if i < 0 {
 		t.Fatalf("link-oidc-modal not found in rendered content")
 	}
-	openTag := out[i:strings.Index(out[i:], ">")+i]
+	openTag := out[i : strings.Index(out[i:], ">")+i]
 
 	if strings.Contains(openTag, "display:flex") {
 		t.Errorf("modal is visible by default (display:flex overrides any hidden state): %s", openTag)

@@ -10,9 +10,9 @@ import (
 )
 
 type mockDockerClient struct {
-	mu       sync.Mutex
-	started  []string
-	stopped  []string
+	mu      sync.Mutex
+	started []string
+	stopped []string
 }
 
 func (m *mockDockerClient) StartContainer(ctx context.Context, name string) error {

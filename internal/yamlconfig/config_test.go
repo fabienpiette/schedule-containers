@@ -12,17 +12,17 @@ func TestFromSchedules(t *testing.T) {
 	schedules := []models.Schedule{
 		{
 			ContainerName: "my-app",
-			DisplayName:  "My App",
-			StartCron:    "0 8 * * 1-5",
-			StopCron:     "0 18 * * 1-5",
-			Enabled:      true,
+			DisplayName:   "My App",
+			StartCron:     "0 8 * * 1-5",
+			StopCron:      "0 18 * * 1-5",
+			Enabled:       true,
 		},
 		{
 			ContainerName: "redis",
-			DisplayName:  "Redis",
-			StartCron:    "0 9 * * *",
-			StopCron:     "0 21 * * *",
-			Enabled:      false,
+			DisplayName:   "Redis",
+			StartCron:     "0 9 * * *",
+			StopCron:      "0 21 * * *",
+			Enabled:       false,
 		},
 	}
 
@@ -117,11 +117,11 @@ func TestRoundTrip(t *testing.T) {
 	original := []models.Schedule{
 		{
 			ContainerName: "webapp",
-			DisplayName:  "Web App",
+			DisplayName:   "Web App",
 			StackName:     "webstack",
-			StartCron:    "0 7 * * 1-5",
-			StopCron:     "0 19 * * 1-5",
-			Enabled:      true,
+			StartCron:     "0 7 * * 1-5",
+			StopCron:      "0 19 * * 1-5",
+			Enabled:       true,
 		},
 	}
 

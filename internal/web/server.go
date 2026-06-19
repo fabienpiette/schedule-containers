@@ -61,8 +61,8 @@ type Server struct {
 var embeddedFS embed.FS
 
 var (
-	_ SchedulerService    = (*scheduler.Scheduler)(nil)
-	_ OnDemandService     = (*ondemand.OnDemandManager)(nil)
+	_ SchedulerService     = (*scheduler.Scheduler)(nil)
+	_ OnDemandService      = (*ondemand.OnDemandManager)(nil)
 	_ StackOnDemandService = (*ondemand.OnDemandManager)(nil)
 )
 
@@ -252,4 +252,3 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
-

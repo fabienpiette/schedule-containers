@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	idleCPUPercent   = 0.1
-	idleNetworkBytes = 1024
+	idleCPUPercent    = 0.1
+	idleNetworkBytes  = 1024
 	statsPollInterval = 5 * time.Second
 	idleCheckInterval = 5 * time.Second
 )

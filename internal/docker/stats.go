@@ -20,10 +20,10 @@ type ContainerHealth struct {
 }
 
 type StatsSnapshot struct {
-	CPUPercent    float64
+	CPUPercent     float64
 	NetworkRxBytes float64
 	NetworkTxBytes float64
-	Timestamp     time.Time
+	Timestamp      time.Time
 }
 
 func parseHealthStatus(status string) string {
@@ -162,10 +162,10 @@ func (c *Client) ContainerStats(ctx context.Context, name string) (<-chan StatsS
 				cpuPercent := computeCPUPercent(&stats, prev)
 				rxBytes, txBytes := computeNetworkBytes(&stats, prev)
 				ch <- StatsSnapshot{
-					CPUPercent:    cpuPercent,
+					CPUPercent:     cpuPercent,
 					NetworkRxBytes: rxBytes,
 					NetworkTxBytes: txBytes,
-					Timestamp:     stats.Read,
+					Timestamp:      stats.Read,
 				}
 			}
 			prev = &stats
@@ -203,4 +203,3 @@ func computeNetworkBytes(current, previous *container.StatsResponse) (rxBytes, t
 	}
 	return rxBytes, txBytes
 }
-

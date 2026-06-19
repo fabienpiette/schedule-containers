@@ -52,9 +52,9 @@ func TestSchedulesContentRenders(t *testing.T) {
 	out := buf.String()
 
 	for _, want := range []string{
-		"Weekdays 08:00",   // humanized container start
-		"Weekdays 18:00",   // humanized container stop
-		"Daily 07:00",      // humanized stack start
+		"Weekdays 08:00", // humanized container start
+		"Weekdays 18:00", // humanized container stop
+		"Daily 07:00",    // humanized stack start
 		`id="panel-containers"`,
 		`id="panel-stacks"`,
 		"stat-strip",

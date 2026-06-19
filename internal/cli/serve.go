@@ -64,34 +64,34 @@ var serveCmd = &cobra.Command{
 			}
 		}
 
-sched.Start()
-	slog.Info("scheduler started", "schedules_loaded", len(schedules))
+		sched.Start()
+		slog.Info("scheduler started", "schedules_loaded", len(schedules))
 
-	stacks, err := db.ListStacks(context.Background())
-	if err != nil {
-		slog.Error("failed to load stacks", "error", err)
-		os.Exit(1)
-	}
-	for _, st := range stacks {
-		if st.Enabled {
-			if err := sched.AddStack(&st); err != nil {
-				slog.Warn("failed to add stack schedule", "id", st.ID, "error", err)
+		stacks, err := db.ListStacks(context.Background())
+		if err != nil {
+			slog.Error("failed to load stacks", "error", err)
+			os.Exit(1)
+		}
+		for _, st := range stacks {
+			if st.Enabled {
+				if err := sched.AddStack(&st); err != nil {
+					slog.Warn("failed to add stack schedule", "id", st.ID, "error", err)
+				}
 			}
 		}
-	}
-	slog.Info("stacks loaded", "stacks_loaded", len(stacks))
+		slog.Info("stacks loaded", "stacks_loaded", len(stacks))
 
-	odm := ondemand.NewManager(dockerClient, db)
-	if err := odm.Start(cmd.Context()); err != nil {
-		slog.Error("failed to start on-demand manager", "error", err)
-		os.Exit(1)
-	}
-
-	for i := range stacks {
-		if stacks[i].OnDemandEnabled && stacks[i].Enabled {
-			odm.AddStack(&stacks[i])
+		odm := ondemand.NewManager(dockerClient, db)
+		if err := odm.Start(cmd.Context()); err != nil {
+			slog.Error("failed to start on-demand manager", "error", err)
+			os.Exit(1)
 		}
-	}
+
+		for i := range stacks {
+			if stacks[i].OnDemandEnabled && stacks[i].Enabled {
+				odm.AddStack(&stacks[i])
+			}
+		}
 
 		presetSvc, err := cronpresets.NewService(cfg.PresetsPath)
 		if err != nil {
