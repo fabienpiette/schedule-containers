@@ -130,4 +130,4 @@ Thanks to all [contributors](https://github.com/fabienpiette/schedule-containers
 
 ## License
 
-[MIT](LICENSE)
+[AGPL-3.0](LICENSE)
