@@ -1,6 +1,14 @@
 <h3 align="center">Schedule Docker containers on cron — start, stop, or wake on demand.<br>Stacks, auth, and a dashboard. Single binary, no dependencies.</h3>
 
 <p align="center">
+  <a href="https://github.com/fabienpiette/schedule-containers/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fabienpiette/schedule-containers/ci.yml?branch=main&label=CI" alt="CI status"></a>
+  <a href="https://github.com/fabienpiette/schedule-containers/releases/latest"><img src="https://img.shields.io/github/v/release/fabienpiette/schedule-containers" alt="Latest release"></a>
+  <a href="https://github.com/fabienpiette/schedule-containers/pkgs/container/schedule-containers"><img src="https://img.shields.io/badge/ghcr.io-image-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
+  <img src="https://img.shields.io/github/go-mod/go-version/fabienpiette/schedule-containers" alt="Go version">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/fabienpiette/schedule-containers" alt="License: AGPL-3.0"></a>
+</p>
+
+<p align="center">
   <img src="docs/demo.gif" alt="Demo" width="600">
 </p>
 
