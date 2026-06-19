@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/models"
 )
 
 type mockDockerClient struct {

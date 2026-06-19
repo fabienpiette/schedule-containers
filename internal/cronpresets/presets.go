@@ -6,8 +6,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/gndm/schedule-containers/internal/models"
-	"github.com/gndm/schedule-containers/internal/scheduler"
+	"github.com/fabienpiette/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/scheduler"
 	"gopkg.in/yaml.v3"
 )
 

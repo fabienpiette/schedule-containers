@@ -1,4 +1,4 @@
-module github.com/gndm/schedule-containers
+module github.com/fabienpiette/schedule-containers
 
 go 1.25.3
 

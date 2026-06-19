@@ -12,11 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/gndm/schedule-containers/internal/config"
-	"github.com/gndm/schedule-containers/internal/cronpresets"
-	"github.com/gndm/schedule-containers/internal/docker"
-	"github.com/gndm/schedule-containers/internal/models"
-	"github.com/gndm/schedule-containers/internal/store"
+	"github.com/fabienpiette/schedule-containers/internal/config"
+	"github.com/fabienpiette/schedule-containers/internal/cronpresets"
+	"github.com/fabienpiette/schedule-containers/internal/docker"
+	"github.com/fabienpiette/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/store"
 )
 
 func setupTestServer(t *testing.T) (*Server, *mockSchedulerService) {

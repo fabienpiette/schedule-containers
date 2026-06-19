@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/gndm/schedule-containers/internal/config"
+	"github.com/fabienpiette/schedule-containers/internal/config"
 )
 
 type oidcDiscovery struct {

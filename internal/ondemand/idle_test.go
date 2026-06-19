@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gndm/schedule-containers/internal/docker"
-	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/docker"
+	"github.com/fabienpiette/schedule-containers/internal/models"
 )
 
 type mockStatsDocker struct {

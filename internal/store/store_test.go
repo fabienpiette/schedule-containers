@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/models"
 )
 
 func tempDB(t *testing.T) *Store {

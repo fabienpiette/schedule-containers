@@ -35,7 +35,7 @@ Push to your own registry with `make docker-release`.
 ### From source
 
 ```bash
-git clone https://github.com/gndm/schedule-containers.git
+git clone https://github.com/fabienpiette/schedule-containers.git
 cd schedule-containers
 make build
 ```
@@ -126,7 +126,7 @@ Contributions welcome — open an issue or pull request. See [Architecture](docs
 
 ## Acknowledgments
 
-Thanks to all [contributors](https://github.com/gndm/schedule-containers/graphs/contributors).
+Thanks to all [contributors](https://github.com/fabienpiette/schedule-containers/graphs/contributors).
 
 ## License
 

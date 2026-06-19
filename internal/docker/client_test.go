@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/models"
 )
 
 func TestTransformContainers(t *testing.T) {

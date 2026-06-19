@@ -6,7 +6,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
-	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/models"
 )
 
 type Client struct {

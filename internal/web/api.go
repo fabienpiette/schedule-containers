@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/gndm/schedule-containers/internal/models"
-	"github.com/gndm/schedule-containers/internal/ondemand"
-	"github.com/gndm/schedule-containers/internal/scheduler"
-	"github.com/gndm/schedule-containers/internal/yamlconfig"
+	"github.com/fabienpiette/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/ondemand"
+	"github.com/fabienpiette/schedule-containers/internal/scheduler"
+	"github.com/fabienpiette/schedule-containers/internal/yamlconfig"
 )
 
 type applyRequest struct {

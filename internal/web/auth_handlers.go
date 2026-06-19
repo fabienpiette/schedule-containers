@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gndm/schedule-containers/internal/auth"
-	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/auth"
+	"github.com/fabienpiette/schedule-containers/internal/models"
 )
 
 type authPageData struct {

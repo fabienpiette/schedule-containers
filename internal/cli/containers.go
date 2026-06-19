@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gndm/schedule-containers/internal/config"
-	"github.com/gndm/schedule-containers/internal/docker"
+	"github.com/fabienpiette/schedule-containers/internal/config"
+	"github.com/fabienpiette/schedule-containers/internal/docker"
 )
 
 var containersCmd = &cobra.Command{

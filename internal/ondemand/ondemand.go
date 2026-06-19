@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gndm/schedule-containers/internal/docker"
-	"github.com/gndm/schedule-containers/internal/models"
-	"github.com/gndm/schedule-containers/internal/store"
+	"github.com/fabienpiette/schedule-containers/internal/docker"
+	"github.com/fabienpiette/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/store"
 )
 
 var ErrScheduleNotFound = errors.New("no on-demand schedule found for container")

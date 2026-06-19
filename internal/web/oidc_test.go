@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gndm/schedule-containers/internal/config"
+	"github.com/fabienpiette/schedule-containers/internal/config"
 )
 
 func TestGenerateCodeVerifier(t *testing.T) {

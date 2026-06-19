@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/models"
 )
 
 type mockStackDocker struct {

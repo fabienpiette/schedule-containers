@@ -10,11 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gndm/schedule-containers/internal/config"
-	"github.com/gndm/schedule-containers/internal/models"
-	"github.com/gndm/schedule-containers/internal/scheduler"
-	"github.com/gndm/schedule-containers/internal/store"
-	"github.com/gndm/schedule-containers/internal/yamlconfig"
+	"github.com/fabienpiette/schedule-containers/internal/config"
+	"github.com/fabienpiette/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/scheduler"
+	"github.com/fabienpiette/schedule-containers/internal/store"
+	"github.com/fabienpiette/schedule-containers/internal/yamlconfig"
 )
 
 var scheduleCmd = &cobra.Command{

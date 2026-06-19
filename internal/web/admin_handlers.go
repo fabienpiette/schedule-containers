@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gndm/schedule-containers/internal/auth"
-	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/auth"
+	"github.com/fabienpiette/schedule-containers/internal/models"
 )
 
 type adminUsersData struct {

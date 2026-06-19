@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gndm/schedule-containers/internal/auth"
-	"github.com/gndm/schedule-containers/internal/models"
-	"github.com/gndm/schedule-containers/internal/store"
+	"github.com/fabienpiette/schedule-containers/internal/auth"
+	"github.com/fabienpiette/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/store"
 )
 
 func testStore(t *testing.T) *store.Store {

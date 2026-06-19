@@ -13,13 +13,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 
-	"github.com/gndm/schedule-containers/internal/config"
-	"github.com/gndm/schedule-containers/internal/cronpresets"
-	"github.com/gndm/schedule-containers/internal/docker"
-	"github.com/gndm/schedule-containers/internal/models"
-	"github.com/gndm/schedule-containers/internal/ondemand"
-	"github.com/gndm/schedule-containers/internal/scheduler"
-	"github.com/gndm/schedule-containers/internal/store"
+	"github.com/fabienpiette/schedule-containers/internal/config"
+	"github.com/fabienpiette/schedule-containers/internal/cronpresets"
+	"github.com/fabienpiette/schedule-containers/internal/docker"
+	"github.com/fabienpiette/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/ondemand"
+	"github.com/fabienpiette/schedule-containers/internal/scheduler"
+	"github.com/fabienpiette/schedule-containers/internal/store"
 )
 
 type SchedulerService interface {

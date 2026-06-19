@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gndm/schedule-containers/internal/cli"
+	"github.com/fabienpiette/schedule-containers/internal/cli"
 )
 
 func main() {

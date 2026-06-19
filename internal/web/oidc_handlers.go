@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/gndm/schedule-containers/internal/auth"
-	"github.com/gndm/schedule-containers/internal/models"
+	"github.com/fabienpiette/schedule-containers/internal/auth"
+	"github.com/fabienpiette/schedule-containers/internal/models"
 )
 
 func (s *Server) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
