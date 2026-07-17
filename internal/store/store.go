@@ -155,6 +155,29 @@ func (s *Store) migrate() error {
 		}
 	}
 
+	if version < 6 {
+		_, err = s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS log_rules (
+				id              TEXT PRIMARY KEY,
+				container_name  TEXT NOT NULL,
+				pattern         TEXT NOT NULL,
+				match_type      TEXT NOT NULL DEFAULT 'substring',
+				enabled         INTEGER NOT NULL DEFAULT 1,
+				cooldown_sec    INTEGER NOT NULL DEFAULT 60,
+				disabled_reason TEXT,
+				last_matched_at TIMESTAMP,
+				created_at      TIMESTAMP NOT NULL,
+				updated_at      TIMESTAMP NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_log_rules_container ON log_rules(container_name);
+			UPDATE schema_version SET version = 6;
+			INSERT OR IGNORE INTO schema_version (version) VALUES (6);
+		`)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -718,5 +741,109 @@ func (s *Store) DeleteExpiredSessions(ctx context.Context) error {
 
 func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
+	return err
+}
+
+// --- Log rule CRUD ---
+
+const logRuleColumns = `id, container_name, pattern, match_type, enabled, cooldown_sec, disabled_reason, last_matched_at, created_at, updated_at`
+
+func scanLogRule(row interface{ Scan(...any) error }) (*models.LogRule, error) {
+	var r models.LogRule
+	if err := row.Scan(&r.ID, &r.ContainerName, &r.Pattern, &r.MatchType, &r.Enabled,
+		&r.CooldownSec, &r.DisabledReason, &r.LastMatchedAt, &r.CreatedAt, &r.UpdatedAt); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (s *Store) CreateLogRule(ctx context.Context, r *models.LogRule) (*models.LogRule, error) {
+	now := time.Now().UTC()
+	r.ID = uuid.New().String()
+	r.CreatedAt = now
+	r.UpdatedAt = now
+	if r.CooldownSec == 0 {
+		r.CooldownSec = 60
+	}
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO log_rules (id, container_name, pattern, match_type, enabled, cooldown_sec, disabled_reason, last_matched_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ContainerName, r.Pattern, r.MatchType, r.Enabled, r.CooldownSec,
+		r.DisabledReason, r.LastMatchedAt, r.CreatedAt, r.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (s *Store) GetLogRule(ctx context.Context, id string) (*models.LogRule, error) {
+	row := s.db.QueryRowContext(ctx, `SELECT `+logRuleColumns+` FROM log_rules WHERE id = ?`, id)
+	return scanLogRule(row)
+}
+
+func (s *Store) ListLogRules(ctx context.Context) ([]models.LogRule, error) {
+	return s.queryLogRules(ctx, `SELECT `+logRuleColumns+` FROM log_rules ORDER BY created_at`)
+}
+
+func (s *Store) ListEnabledLogRules(ctx context.Context) ([]models.LogRule, error) {
+	return s.queryLogRules(ctx, `SELECT `+logRuleColumns+` FROM log_rules WHERE enabled = 1 ORDER BY created_at`)
+}
+
+func (s *Store) queryLogRules(ctx context.Context, query string, args ...any) ([]models.LogRule, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var rules []models.LogRule
+	for rows.Next() {
+		r, err := scanLogRule(rows)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, *r)
+	}
+	return rules, rows.Err()
+}
+
+func (s *Store) UpdateLogRule(ctx context.Context, r *models.LogRule) (*models.LogRule, error) {
+	r.UpdatedAt = time.Now().UTC()
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE log_rules SET container_name=?, pattern=?, match_type=?, enabled=?, cooldown_sec=?, disabled_reason=?, last_matched_at=?, updated_at=?
+		WHERE id=?`,
+		r.ContainerName, r.Pattern, r.MatchType, r.Enabled, r.CooldownSec,
+		r.DisabledReason, r.LastMatchedAt, r.UpdatedAt, r.ID)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (s *Store) DeleteLogRule(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM log_rules WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) ToggleLogRule(ctx context.Context, id string) (*models.LogRule, error) {
+	r, err := s.GetLogRule(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	r.Enabled = !r.Enabled
+	if r.Enabled {
+		r.DisabledReason = nil // re-enabling clears the breaker reason
+	}
+	return s.UpdateLogRule(ctx, r)
+}
+
+func (s *Store) SetLogRuleDisabled(ctx context.Context, id, reason string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE log_rules SET enabled=0, disabled_reason=?, updated_at=? WHERE id=?`,
+		reason, time.Now().UTC(), id)
+	return err
+}
+
+func (s *Store) TouchLogRuleMatched(ctx context.Context, id string, at time.Time) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE log_rules SET last_matched_at=?, updated_at=? WHERE id=?`,
+		at.UTC(), time.Now().UTC(), id)
 	return err
 }
