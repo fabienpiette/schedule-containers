@@ -119,6 +119,7 @@ var serveCmd = &cobra.Command{
 
 		slog.Info("shutting down")
 		odm.Stop()
+		lwm.Stop()
 		sched.Stop()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
