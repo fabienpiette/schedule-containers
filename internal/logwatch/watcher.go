@@ -68,6 +68,8 @@ func newWatcher(container string, rules []models.LogRule, docker DockerClient, h
 	return &watcher{container: container, rules: compiled, docker: docker, hooks: hooks, now: now}, nil
 }
 
+// start launches the watcher's background goroutine. It must be called at
+// most once per watcher — a second call orphans the first goroutine.
 func (w *watcher) start(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	w.cancel = cancel
@@ -136,7 +138,7 @@ func (w *watcher) evaluate(ctx context.Context, line string) bool {
 		if !cr.matcher.Matches(line) {
 			continue
 		}
-		if !cr.lastFire.IsZero() && now.Sub(cr.lastFire) < time.Duration(cr.rule.CooldownSec)*time.Second {
+		if !cr.lastFire.IsZero() && now.Sub(cr.lastFire) < cr.rule.Cooldown() {
 			slog.Debug("logwatch: match within cooldown, skipping", "container", w.container, "rule", cr.rule.ID)
 			continue
 		}

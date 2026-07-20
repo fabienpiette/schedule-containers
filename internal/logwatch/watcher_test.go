@@ -119,17 +119,31 @@ func TestWatcher_CooldownSuppresses(t *testing.T) {
 
 func TestWatcher_BreakerTrips(t *testing.T) {
 	m := newMockDocker()
-	rule := models.LogRule{ID: "r1", ContainerName: "web", Pattern: "boom", MatchType: models.MatchSubstring, Enabled: true, CooldownSec: 0}
+	rule := models.LogRule{ID: "r1", ContainerName: "web", Pattern: "boom", MatchType: models.MatchSubstring, Enabled: true, CooldownSec: 1}
+
+	// controllable clock: advanced past the 1s cooldown before each send, but
+	// the total elapsed time stays well within the 10m breakerWindow so all
+	// fires count toward the breaker.
+	var mu sync.Mutex
+	nowT := time.Now()
+	clock := func() time.Time { mu.Lock(); defer mu.Unlock(); return nowT }
+	advance := func(d time.Duration) {
+		mu.Lock()
+		nowT = nowT.Add(d)
+		mu.Unlock()
+	}
 
 	tripped := make(chan string, 1)
 	w, _ := newWatcher("web", []models.LogRule{rule}, m, watcherHooks{
 		onBreakerTrip: func(id, reason string) { tripped <- id },
-	}, time.Now)
+	}, clock)
 	w.start(context.Background())
 	defer w.stop()
 
-	// cooldown 0 → each "boom" restarts; after maxRestarts+1 the breaker trips
+	// advance the clock past the cooldown before each match so every "boom"
+	// fires a restart; after maxRestarts+1 the breaker trips.
 	for i := 0; i < maxRestarts+1; i++ {
+		advance(2 * time.Second)
 		m.send("boom")
 		time.Sleep(20 * time.Millisecond)
 	}
