@@ -31,6 +31,7 @@ docker compose up -d
 - **Inactivity auto-stop** — Stop containers after configurable idle timeout (monitors CPU and network activity)
 - **Authentication** — Login, sessions, and three roles (reader, writer, admin). First run prompts for admin setup. OIDC login via Pocket ID or any OpenID Connect provider
 - **Tags** — Reusable schedule templates applied to multiple containers at once
+- **Log-based restart** — Restart a running container when its logs match a rule (substring or regex), with per-rule cooldown and a circuit breaker that auto-disables runaway rules
 
 ## License
 

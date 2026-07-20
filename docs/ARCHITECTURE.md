@@ -101,6 +101,14 @@ Key files: `ondemand.go`, `idle.go`
 
 **Architecture Invariant:** On-demand works independently of cron scheduling. A schedule with `Enabled=false, OnDemandEnabled=true` has no cron start/stop but still has a wake URL and idle monitor. The ondemand package holds its own per-container mutex map for wake serialization, separate from the scheduler's.
 
+### `internal/logwatch/`
+
+Log-based container restarts. `Manager` runs one goroutine and one Docker log stream per *container* that has at least one enabled log rule — not one per rule. Each incoming log line is evaluated against that container's compiled matchers (substring or regex). On a match, the matcher's rule triggers a restart, gated by a per-rule cooldown (no repeat restarts within the configured window) and a per-rule circuit breaker that auto-disables a rule after too many restarts in a short window, preventing restart loops. The web layer live-updates watched containers and rules through the `LogWatchService` interface (`AddRule`/`UpdateRule`/`RemoveRule`) rather than restarting the manager.
+
+Key files: `matcher.go`, `watcher.go`, `manager.go`
+
+**Architecture Invariant:** `logwatch` depends only on `docker`, `store`, and `models` — it does not import `scheduler`, `ondemand`, or `web`.
+
 ### `internal/yamlconfig/`
 
 YAML import/export for schedules and tags. `FromSchedulesAndTags` serializes schedules and tags to YAML bytes, grouping tag-derived schedules under their tag. `ToSchedulesAndTags` parses YAML into schedule and tag models.
