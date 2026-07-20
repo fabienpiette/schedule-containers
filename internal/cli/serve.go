@@ -13,6 +13,7 @@ import (
 	"github.com/fabienpiette/schedule-containers/internal/config"
 	"github.com/fabienpiette/schedule-containers/internal/cronpresets"
 	"github.com/fabienpiette/schedule-containers/internal/docker"
+	"github.com/fabienpiette/schedule-containers/internal/logwatch"
 	"github.com/fabienpiette/schedule-containers/internal/ondemand"
 	"github.com/fabienpiette/schedule-containers/internal/scheduler"
 	"github.com/fabienpiette/schedule-containers/internal/store"
@@ -91,6 +92,12 @@ var serveCmd = &cobra.Command{
 			if stacks[i].OnDemandEnabled && stacks[i].Enabled {
 				odm.AddStack(&stacks[i])
 			}
+		}
+
+		lwm := logwatch.NewManager(dockerClient, db)
+		if err := lwm.Start(cmd.Context()); err != nil {
+			slog.Error("failed to start log-watch manager", "error", err)
+			os.Exit(1)
 		}
 
 		presetSvc, err := cronpresets.NewService(cfg.PresetsPath)
