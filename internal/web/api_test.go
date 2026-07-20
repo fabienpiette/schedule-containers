@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -45,9 +46,15 @@ func setupTestServer(t *testing.T) (*Server, *mockSchedulerService) {
 	cfg := &config.Config{WebHost: "127.0.0.1", WebPort: 0}
 
 	dockerClient, _ := docker.NewClient("unix:///var/run/docker.sock")
-	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, nil, nil)
+	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, nil, nil, noopLogWatch{})
 	return srv, mockSched
 }
+
+type noopLogWatch struct{}
+
+func (noopLogWatch) AddRule(models.LogRule)    {}
+func (noopLogWatch) UpdateRule(models.LogRule) {}
+func (noopLogWatch) RemoveRule(string)         {}
 
 type mockSchedulerService struct {
 	schedules map[string]*models.Schedule
@@ -778,5 +785,37 @@ func TestAPIUpdateScheduleRejectsCronChangeForTagSchedule(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestAPICreateLogRule_ValidatesRegex(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	body := `{"container_name":"web","pattern":"([","match_type":"regex","enabled":true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/log-rules", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.apiCreateLogRule(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid regex, got %d", w.Code)
+	}
+}
+
+func TestAPICreateLogRule_Succeeds(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	body := `{"container_name":"web","pattern":"boom","match_type":"substring","enabled":true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/log-rules", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.apiCreateLogRule(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d (%s)", w.Code, w.Body.String())
+	}
+	rules, _ := srv.store.ListLogRules(context.Background())
+	if len(rules) != 1 || rules[0].ContainerName != "web" {
+		t.Fatalf("expected 1 rule for web, got %+v", rules)
 	}
 }

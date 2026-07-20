@@ -512,3 +512,6 @@ func (s *Server) handleWakeStackStatus(w http.ResponseWriter, r *http.Request) {
 		"url":     result.OnDemandURL,
 	})
 }
+
+// handleLogRules renders the log-restart-rules page. Implemented fully in Task 8.
+func (s *Server) handleLogRules(w http.ResponseWriter, r *http.Request) {}

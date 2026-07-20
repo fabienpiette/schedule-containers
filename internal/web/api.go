@@ -1185,3 +1185,96 @@ func (s *Server) apiToggleStack(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(toggled)
 }
+
+func (s *Server) apiListLogRules(w http.ResponseWriter, r *http.Request) {
+	rules, err := s.store.ListLogRules(r.Context())
+	if err != nil {
+		http.Error(w, "failed to list log rules", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(rules)
+}
+
+func (s *Server) apiCreateLogRule(w http.ResponseWriter, r *http.Request) {
+	var req models.LogRule
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.MatchType == "" {
+		req.MatchType = models.MatchSubstring
+	}
+	if err := req.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	created, err := s.store.CreateLogRule(r.Context(), &req)
+	if err != nil {
+		slog.Error("failed to create log rule", "error", err)
+		http.Error(w, "failed to create log rule", http.StatusInternalServerError)
+		return
+	}
+	if created.Enabled {
+		s.logwatch.AddRule(*created)
+	}
+	slog.Info("created log rule", "container", created.ContainerName, "match_type", created.MatchType)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(created)
+}
+
+func (s *Server) apiUpdateLogRule(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if _, err := s.store.GetLogRule(r.Context(), id); err != nil {
+		http.Error(w, "log rule not found", http.StatusNotFound)
+		return
+	}
+	var req models.LogRule
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	req.ID = id
+	if req.MatchType == "" {
+		req.MatchType = models.MatchSubstring
+	}
+	if err := req.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	updated, err := s.store.UpdateLogRule(r.Context(), &req)
+	if err != nil {
+		http.Error(w, "failed to update log rule", http.StatusInternalServerError)
+		return
+	}
+	s.logwatch.UpdateRule(*updated)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updated)
+}
+
+func (s *Server) apiToggleLogRule(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	toggled, err := s.store.ToggleLogRule(r.Context(), id)
+	if err != nil {
+		http.Error(w, "log rule not found", http.StatusNotFound)
+		return
+	}
+	if toggled.Enabled {
+		s.logwatch.AddRule(*toggled)
+	} else {
+		s.logwatch.RemoveRule(toggled.ID)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(toggled)
+}
+
+func (s *Server) apiDeleteLogRule(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := s.store.DeleteLogRule(r.Context(), id); err != nil {
+		http.Error(w, "failed to delete log rule", http.StatusInternalServerError)
+		return
+	}
+	s.logwatch.RemoveRule(id)
+	w.WriteHeader(http.StatusNoContent)
+}

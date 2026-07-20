@@ -106,7 +106,7 @@ var serveCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		webSrv := web.NewServer(cfg, db, dockerClient, sched, presetSvc, odm, odm)
+		webSrv := web.NewServer(cfg, db, dockerClient, sched, presetSvc, odm, odm, lwm)
 		go func() {
 			if err := webSrv.Start(); err != nil {
 				slog.Error("web server error", "error", err)

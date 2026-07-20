@@ -16,6 +16,7 @@ import (
 	"github.com/fabienpiette/schedule-containers/internal/config"
 	"github.com/fabienpiette/schedule-containers/internal/cronpresets"
 	"github.com/fabienpiette/schedule-containers/internal/docker"
+	"github.com/fabienpiette/schedule-containers/internal/logwatch"
 	"github.com/fabienpiette/schedule-containers/internal/models"
 	"github.com/fabienpiette/schedule-containers/internal/ondemand"
 	"github.com/fabienpiette/schedule-containers/internal/scheduler"
@@ -45,6 +46,12 @@ type StackOnDemandService interface {
 	CheckStackHealth(ctx context.Context, stackName string) (*ondemand.HealthResult, error)
 }
 
+type LogWatchService interface {
+	AddRule(rule models.LogRule)
+	UpdateRule(rule models.LogRule)
+	RemoveRule(ruleID string)
+}
+
 type Server struct {
 	httpServer    *http.Server
 	store         *store.Store
@@ -53,6 +60,7 @@ type Server struct {
 	presetService *cronpresets.Service
 	ondemand      OnDemandService
 	stackOndemand StackOnDemandService
+	logwatch      LogWatchService
 	templates     map[string]*template.Template
 	oidcProvider  *oidcProvider
 }
@@ -64,9 +72,10 @@ var (
 	_ SchedulerService     = (*scheduler.Scheduler)(nil)
 	_ OnDemandService      = (*ondemand.OnDemandManager)(nil)
 	_ StackOnDemandService = (*ondemand.OnDemandManager)(nil)
+	_ LogWatchService      = (*logwatch.Manager)(nil)
 )
 
-func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service, odm OnDemandService, sodm StackOnDemandService) *Server {
+func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched SchedulerService, ps *cronpresets.Service, odm OnDemandService, sodm StackOnDemandService, logWatch LogWatchService) *Server {
 	baseFiles := []string{
 		"templates/layout.html",
 		"templates/partials.html",
@@ -101,6 +110,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		presetService: ps,
 		ondemand:      odm,
 		stackOndemand: sodm,
+		logwatch:      logWatch,
 		templates:     templates,
 	}
 
@@ -147,6 +157,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		r.Get("/schedules", srv.handleSchedulesNew)
 		r.Get("/presets", srv.handlePresets)
 		r.Get("/tags", srv.handleTags)
+		r.Get("/log-rules", srv.handleLogRules)
 
 		r.Route("/api", func(r chi.Router) {
 			// Reader endpoints
@@ -159,6 +170,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 			r.Get("/tags/{id}", srv.apiGetTag)
 			r.Get("/stacks", srv.apiListStacks)
 			r.Get("/stacks/{id}", srv.apiGetStack)
+			r.Get("/log-rules", srv.apiListLogRules)
 
 			// Writer endpoints
 			r.Group(func(r chi.Router) {
@@ -178,6 +190,9 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 				r.Put("/stacks/{id}", srv.apiUpdateStack)
 				r.Post("/stacks/{id}/toggle", srv.apiToggleStack)
 				r.Post("/import", srv.apiImportSchedules)
+				r.Post("/log-rules", srv.apiCreateLogRule)
+				r.Put("/log-rules/{id}", srv.apiUpdateLogRule)
+				r.Post("/log-rules/{id}/toggle", srv.apiToggleLogRule)
 			})
 
 			// Admin endpoints
@@ -188,6 +203,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 				r.Delete("/tags/{id}", srv.apiDeleteTag)
 				r.Delete("/stacks/{id}", srv.apiDeleteStack)
 				r.Get("/export", srv.apiExportSchedules)
+				r.Delete("/log-rules/{id}", srv.apiDeleteLogRule)
 			})
 		})
 
