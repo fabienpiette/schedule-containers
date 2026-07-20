@@ -1226,7 +1226,8 @@ func (s *Server) apiCreateLogRule(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiUpdateLogRule(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if _, err := s.store.GetLogRule(r.Context(), id); err != nil {
+	existing, err := s.store.GetLogRule(r.Context(), id)
+	if err != nil {
 		http.Error(w, "log rule not found", http.StatusNotFound)
 		return
 	}
@@ -1242,6 +1243,12 @@ func (s *Server) apiUpdateLogRule(w http.ResponseWriter, r *http.Request) {
 	if err := req.Validate(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	req.LastMatchedAt = existing.LastMatchedAt
+	if req.Enabled {
+		req.DisabledReason = nil
+	} else {
+		req.DisabledReason = existing.DisabledReason
 	}
 	updated, err := s.store.UpdateLogRule(r.Context(), &req)
 	if err != nil {
