@@ -86,7 +86,7 @@ func setupWakeTestServer(t *testing.T, mockODM *mockOnDemandService) (*Server, *
 	cfg := &config.Config{WebHost: "127.0.0.1", WebPort: 0}
 
 	dockerClient, _ := docker.NewClient("unix:///var/run/docker.sock")
-	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, mockODM, mockODM, noopLogWatch{})
+	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, mockODM, mockODM, &spyLogWatch{})
 	return srv, mockSched
 }
 
