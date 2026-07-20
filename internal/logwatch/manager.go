@@ -84,10 +84,14 @@ func (m *Manager) Stop() {
 func (m *Manager) AddRule(rule models.LogRule) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	old, existed := m.rules[rule.ID]
 	if !rule.Enabled {
 		delete(m.rules, rule.ID)
 	} else {
 		m.rules[rule.ID] = rule
+	}
+	if existed && old.ContainerName != rule.ContainerName {
+		m.rebuildLocked(old.ContainerName)
 	}
 	m.rebuildLocked(rule.ContainerName)
 }
