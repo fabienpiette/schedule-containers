@@ -54,6 +54,7 @@ func (c *Client) FollowLogs(ctx context.Context, name string, since time.Time) (
 		}
 		// Non-TTY streams are multiplexed; demux stdout+stderr into one pipe.
 		pr, pw := io.Pipe()
+		defer pr.Close()
 		go func() {
 			_, cerr := stdcopy.StdCopy(pw, pw, rc)
 			pw.CloseWithError(cerr)
