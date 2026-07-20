@@ -85,6 +85,7 @@ func NewServer(cfg *config.Config, s *store.Store, d *docker.Client, sched Sched
 		"schedules.html":   "templates/schedules.html",
 		"presets.html":     "templates/presets.html",
 		"tags.html":        "templates/tags.html",
+		"log_rules.html":   "templates/log_rules.html",
 		"admin_users.html": "templates/admin_users.html",
 	}
 

@@ -1,0 +1,129 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>Log Rules</h1>
+
+<button class="btn-primary" onclick="document.getElementById('log-rule-dialog').showModal()">Create Log Rule</button>
+
+<dialog id="log-rule-dialog" class="dialog-card">
+  <form id="log-rule-form">
+    <h2>Create Log Rule</h2>
+    <div class="form-group">
+        <label for="container_name">Container</label>
+        <select name="container_name" id="container_name" class="form-select" required>
+            <option value="">-- Select a container --</option>
+            {{range .Containers}}
+            <option value="{{.}}">{{.}}</option>
+            {{end}}
+        </select>
+
+        <label for="pattern">Pattern</label>
+        <input type="text" name="pattern" id="pattern" class="form-input" placeholder="e.g. OutOfMemoryError" required>
+
+        <label for="match_type">Match Type</label>
+        <select name="match_type" id="match_type" class="form-select">
+            <option value="substring">Substring</option>
+            <option value="regex">Regex</option>
+        </select>
+
+        <label for="cooldown_sec">Cooldown</label>
+        <div class="input-suffix-wrap">
+            <input type="number" name="cooldown_sec" id="cooldown_sec" class="form-input" value="60" min="0">
+            <span class="input-suffix">seconds</span>
+        </div>
+        <small>Minimum time between automatic restarts for this rule</small>
+
+        <label class="check-label">
+            <input type="checkbox" name="enabled" id="log_rule_enabled" checked>
+            <span>Enabled</span>
+        </label>
+
+        <button type="submit" class="btn-primary">Create Log Rule</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('log-rule-dialog').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+{{if .Rules}}
+<input type="text" id="log-rule-search" class="table-search" placeholder="Search log rules...">
+<table class="data-table" id="log-rule-table">
+    <thead>
+        <tr>
+            <th data-sort="container">Container</th>
+            <th data-sort="pattern">Pattern</th>
+            <th data-sort="type">Type</th>
+            <th data-sort="cooldown">Cooldown</th>
+            <th data-sort="last_matched">Last matched</th>
+            <th data-sort="status">Status</th>
+            <th class="col-actions"></th>
+        </tr>
+    </thead>
+    <tbody id="log-rule-tbody">
+        {{template "log-rule-tbody" .}}
+    </tbody>
+</table>
+{{else}}
+<p class="muted">No log rules configured. Create one to get started.</p>
+{{end}}
+{{end}}
+
+{{define "scripts"}}
+<script>
+document.getElementById('log-rule-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var form = e.target;
+    var data = {
+        container_name: form.container_name.value,
+        pattern: form.pattern.value,
+        match_type: form.match_type.value,
+        cooldown_sec: parseInt(form.cooldown_sec.value, 10) || 60,
+        enabled: form.enabled.checked
+    };
+    fetch('/api/log-rules', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(function(r) {
+        if (r.ok) {
+            showToast('Log rule created');
+            document.getElementById('log-rule-dialog').close();
+            location.reload();
+        } else {
+            return r.text().then(function(t) { throw new Error(t); });
+        }
+    }).catch(function(err) {
+        showToast(err.message, 'error');
+    });
+});
+
+function toggleLogRule(id) {
+    fetch('/api/log-rules/' + id + '/toggle', {method: 'POST'}).then(function(r) {
+        if (r.ok) {
+            showToast('Log rule toggled');
+            location.reload();
+        } else {
+            return r.text().then(function(t) { throw new Error(t); });
+        }
+    }).catch(function(err) {
+        showToast(err.message, 'error');
+    });
+}
+
+function deleteLogRule(id, label) {
+    showConfirm('Delete Log Rule', 'Remove log rule for ' + label + '?', function() {
+        fetch('/api/log-rules/' + id, {method: 'DELETE'}).then(function(r) {
+            if (r.ok) {
+                showToast('Log rule deleted');
+                location.reload();
+            } else {
+                return r.text().then(function(t) { throw new Error(t); });
+            }
+        }).catch(function(err) {
+            showToast(err.message, 'error');
+        });
+    });
+}
+
+setupTable('log-rule-table','log-rule-search');
+</script>
+{{end}}
