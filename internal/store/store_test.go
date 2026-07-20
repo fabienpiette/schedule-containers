@@ -957,3 +957,57 @@ func TestLogRuleCRUD(t *testing.T) {
 		t.Fatal("expected error getting deleted rule")
 	}
 }
+
+func TestLogRule_TouchAndDisable(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	r := &models.LogRule{
+		ContainerName: "api",
+		Pattern:       "panic",
+		MatchType:     models.MatchSubstring,
+		Enabled:       true,
+		CooldownSec:   10,
+	}
+	created, err := s.CreateLogRule(ctx, r)
+	if err != nil {
+		t.Fatalf("CreateLogRule: %v", err)
+	}
+	if created.LastMatchedAt != nil {
+		t.Fatalf("expected nil LastMatchedAt on create, got %v", created.LastMatchedAt)
+	}
+
+	matchedAt := time.Now().UTC().Truncate(time.Second)
+	if err := s.TouchLogRuleMatched(ctx, created.ID, matchedAt); err != nil {
+		t.Fatalf("TouchLogRuleMatched: %v", err)
+	}
+
+	got, err := s.GetLogRule(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetLogRule: %v", err)
+	}
+	if got.LastMatchedAt == nil {
+		t.Fatal("expected non-nil LastMatchedAt after touch")
+	}
+	if !got.LastMatchedAt.Equal(matchedAt) {
+		t.Fatalf("LastMatchedAt = %v, want %v", got.LastMatchedAt, matchedAt)
+	}
+
+	if err := s.SetLogRuleDisabled(ctx, created.ID, "breaker tripped"); err != nil {
+		t.Fatalf("SetLogRuleDisabled: %v", err)
+	}
+	got, err = s.GetLogRule(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetLogRule after disable: %v", err)
+	}
+	if got.Enabled {
+		t.Fatal("expected rule to be disabled")
+	}
+	if got.DisabledReason == nil || *got.DisabledReason != "breaker tripped" {
+		t.Fatalf("expected disabled reason, got %+v", got.DisabledReason)
+	}
+	// LastMatchedAt should survive the disable.
+	if got.LastMatchedAt == nil || !got.LastMatchedAt.Equal(matchedAt) {
+		t.Fatalf("expected LastMatchedAt to persist across disable, got %v", got.LastMatchedAt)
+	}
+}
