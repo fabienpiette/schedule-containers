@@ -58,7 +58,7 @@
             <th class="col-actions"></th>
         </tr>
     </thead>
-    <tbody id="log-rule-tbody">
+    <tbody id="log-rule-tbody" hx-get="/api/log-rules" hx-trigger="refreshList" hx-swap="innerHTML">
         {{template "log-rule-tbody" .}}
     </tbody>
 </table>
@@ -87,7 +87,7 @@ document.getElementById('log-rule-form').addEventListener('submit', function(e) 
         if (r.ok) {
             showToast('Log rule created');
             document.getElementById('log-rule-dialog').close();
-            location.reload();
+            htmx.trigger('#log-rule-tbody', 'refreshList');
         } else {
             return r.text().then(function(t) { throw new Error(t); });
         }
@@ -100,7 +100,7 @@ function toggleLogRule(id) {
     fetch('/api/log-rules/' + id + '/toggle', {method: 'POST'}).then(function(r) {
         if (r.ok) {
             showToast('Log rule toggled');
-            location.reload();
+            htmx.trigger('#log-rule-tbody', 'refreshList');
         } else {
             return r.text().then(function(t) { throw new Error(t); });
         }
@@ -114,7 +114,7 @@ function deleteLogRule(id, label) {
         fetch('/api/log-rules/' + id, {method: 'DELETE'}).then(function(r) {
             if (r.ok) {
                 showToast('Log rule deleted');
-                location.reload();
+                htmx.trigger('#log-rule-tbody', 'refreshList');
             } else {
                 return r.text().then(function(t) { throw new Error(t); });
             }

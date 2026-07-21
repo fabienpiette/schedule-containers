@@ -1192,6 +1192,11 @@ func (s *Server) apiListLogRules(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list log rules", http.StatusInternalServerError)
 		return
 	}
+	if wantsHTML(r) {
+		w.Header().Set("Content-Type", "text/html")
+		s.renderPartial(w, "log-rule-tbody", LogRulesData{Rules: rules})
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(rules)
 }

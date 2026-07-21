@@ -855,6 +855,34 @@ func TestAPICreateLogRule_Succeeds(t *testing.T) {
 	}
 }
 
+func TestAPIListLogRules_HTMLPartial(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	if _, err := srv.store.CreateLogRule(context.Background(), &models.LogRule{
+		ContainerName: "web", Pattern: "boom", MatchType: models.MatchSubstring, Enabled: true,
+	}); err != nil {
+		t.Fatalf("seed rule: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/log-rules", nil)
+	req.Header.Set("HX-Request", "true")
+	w := httptest.NewRecorder()
+	srv.apiListLogRules(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Fatalf("expected text/html content-type, got %q", ct)
+	}
+	body := strings.TrimSpace(w.Body.String())
+	if !strings.Contains(body, "web") || !strings.Contains(body, "boom") {
+		t.Fatalf("expected tbody partial with rule content, got: %s", body)
+	}
+	if strings.HasPrefix(body, "[") || strings.HasPrefix(body, "{") {
+		t.Fatalf("expected HTML partial, got JSON: %s", body)
+	}
+}
+
 func TestAPIUpdateLogRule_CallsUpdateRuleNotAddRule(t *testing.T) {
 	srv, _ := setupTestServer(t)
 
