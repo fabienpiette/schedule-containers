@@ -762,9 +762,6 @@ func (s *Store) CreateLogRule(ctx context.Context, r *models.LogRule) (*models.L
 	r.ID = uuid.New().String()
 	r.CreatedAt = now
 	r.UpdatedAt = now
-	if r.CooldownSec == 0 {
-		r.CooldownSec = 60
-	}
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO log_rules (id, container_name, pattern, match_type, enabled, cooldown_sec, disabled_reason, last_matched_at, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

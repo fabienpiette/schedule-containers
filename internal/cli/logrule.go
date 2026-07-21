@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -40,14 +42,28 @@ var logRuleListCmd = &cobra.Command{
 			slog.Error("failed to list log rules", "error", err)
 			os.Exit(1)
 		}
+
+		if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			if err := enc.Encode(rules); err != nil {
+				slog.Error("failed to encode log rules", "error", err)
+				os.Exit(1)
+			}
+			return
+		}
+
+		tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(tw, "ID\tCONTAINER\tTYPE\tPATTERN\tCOOLDOWN\tSTATUS")
 		for _, r := range rules {
 			status := "enabled"
 			if !r.Enabled {
 				status = "disabled"
 			}
-			fmt.Printf("%s  %-20s  [%s] %q  cooldown=%ds  (%s)\n",
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%q\t%ds\t%s\n",
 				r.ID, r.ContainerName, r.MatchType, r.Pattern, r.CooldownSec, status)
 		}
+		tw.Flush()
 	},
 }
 
@@ -170,6 +186,7 @@ var logRuleDisableCmd = &cobra.Command{
 func init() {
 	logRuleAddCmd.Flags().Bool("regex", false, "treat the pattern as a regular expression")
 	logRuleAddCmd.Flags().Int("cooldown", 60, "seconds to wait between restarts for this rule")
+	logRuleListCmd.Flags().Bool("json", false, "output as JSON")
 
 	logRuleCmd.AddCommand(logRuleListCmd, logRuleAddCmd, logRuleRemoveCmd, logRuleEnableCmd, logRuleDisableCmd)
 	rootCmd.AddCommand(logRuleCmd)

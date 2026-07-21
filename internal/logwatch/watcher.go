@@ -28,10 +28,9 @@ type watcherHooks struct {
 }
 
 type compiledRule struct {
-	rule     models.LogRule
-	matcher  Matcher
-	lastFire time.Time
-	fires    []time.Time // restart timestamps within breakerWindow
+	rule    models.LogRule
+	matcher Matcher
+	fires   []time.Time // restart timestamps within breakerWindow; last entry is the most recent fire
 }
 
 type watcher struct {
@@ -133,12 +132,12 @@ func (w *watcher) consume(ctx context.Context, lines <-chan string) bool {
 // evaluate tests all rules against a line; fires at most one restart. Returns
 // true if a restart was triggered.
 func (w *watcher) evaluate(ctx context.Context, line string) bool {
-	now := w.now()
 	for _, cr := range w.rules {
 		if !cr.matcher.Matches(line) {
 			continue
 		}
-		if !cr.lastFire.IsZero() && now.Sub(cr.lastFire) < cr.rule.Cooldown() {
+		now := w.now()
+		if n := len(cr.fires); n > 0 && now.Sub(cr.fires[n-1]) < cr.rule.Cooldown() {
 			slog.Debug("logwatch: match within cooldown, skipping", "container", w.container, "rule", cr.rule.ID)
 			continue
 		}
@@ -153,7 +152,6 @@ func (w *watcher) fire(ctx context.Context, cr *compiledRule, now time.Time) {
 	if err := w.docker.RestartContainer(ctx, w.container); err != nil {
 		slog.Error("logwatch: restart failed", "container", w.container, "rule", cr.rule.ID, "error", err)
 	}
-	cr.lastFire = now
 	if w.hooks.onMatched != nil {
 		w.hooks.onMatched(cr.rule.ID, now)
 	}

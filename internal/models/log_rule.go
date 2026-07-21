@@ -25,6 +25,13 @@ type LogRule struct {
 	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
+// Normalize applies input defaults for optional fields. Call it before Validate.
+func (r *LogRule) Normalize() {
+	if r.MatchType == "" {
+		r.MatchType = MatchSubstring
+	}
+}
+
 // Validate checks the rule is well-formed. It compiles the pattern for regex rules.
 func (r *LogRule) Validate() error {
 	if r.ContainerName == "" {

@@ -81,25 +81,26 @@ func (m *Manager) Stop() {
 	slog.Info("logwatch: manager stopped")
 }
 
+// AddRule registers a newly created or re-enabled rule and (re)builds the
+// affected container watcher(s).
 func (m *Manager) AddRule(rule models.LogRule) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	old, existed := m.rules[rule.ID]
-	if !rule.Enabled {
-		delete(m.rules, rule.ID)
-	} else {
-		m.rules[rule.ID] = rule
-	}
-	if existed && old.ContainerName != rule.ContainerName {
-		m.rebuildLocked(old.ContainerName)
-	}
-	m.rebuildLocked(rule.ContainerName)
+	m.upsertLocked(rule)
 }
 
-// UpdateRule handles a rule whose container may have changed: rebuild both.
+// UpdateRule applies an edited rule, rebuilding both the old and new container
+// watchers when the rule's container changed.
 func (m *Manager) UpdateRule(rule models.LogRule) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.upsertLocked(rule)
+}
+
+// upsertLocked stores the rule in the set (or removes it when disabled) and
+// rebuilds the watcher for its container, plus the previous container when it
+// changed. Caller holds m.mu.
+func (m *Manager) upsertLocked(rule models.LogRule) {
 	old, existed := m.rules[rule.ID]
 	if rule.Enabled {
 		m.rules[rule.ID] = rule

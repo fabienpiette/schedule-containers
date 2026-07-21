@@ -1202,9 +1202,7 @@ func (s *Server) apiCreateLogRule(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if req.MatchType == "" {
-		req.MatchType = models.MatchSubstring
-	}
+	req.Normalize()
 	if err := req.Validate(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1237,9 +1235,7 @@ func (s *Server) apiUpdateLogRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.ID = id
-	if req.MatchType == "" {
-		req.MatchType = models.MatchSubstring
-	}
+	req.Normalize()
 	if err := req.Validate(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
