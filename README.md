@@ -66,6 +66,7 @@ schedule-containers serve                                          # Start serve
 schedule-containers schedule add my-app "0 8 * * 1-5" "0 18 * * 1-5"  # Add schedule
 schedule-containers tag add business-hours --start "0 8 * * 1-5" --stop "0 18 * * 1-5"
 schedule-containers tag apply business-hours --containers my-app,redis
+schedule-containers log-rule add my-app "OutOfMemoryError" --regex   # Restart on log match
 schedule-containers schedule export schedules.yaml                 # Export
 schedule-containers schedule import schedules.yaml --dry-run        # Import (dry-run)
 ```
@@ -99,13 +100,17 @@ curl -X POST http://localhost:8080/api/stacks \
   -H "Content-Type: application/json" \
   -d '{"name":"my-stack","start_cron":"0 8 * * 1-5","stop_cron":"0 18 * * 1-5","enabled":true}'
 
+curl -X POST http://localhost:8080/api/log-rules \
+  -H "Content-Type: application/json" \
+  -d '{"container_name":"my-app","pattern":"OutOfMemoryError","match_type":"regex","enabled":true}'
+
 curl http://localhost:8080/api/containers/my-app/health
 curl http://localhost:8080/api/schedules/{id}/wake-url
 ```
 
 ### Dashboard
 
-Open `http://localhost:8080` — view containers, manage schedules and stacks, start/stop containers, create and apply tags, configure on-demand wake. First run redirects to a setup page to create the admin account.
+Open `http://localhost:8080` — view containers, manage schedules and stacks, start/stop containers, create and apply tags, configure on-demand wake, and add log-based restart rules. First run redirects to a setup page to create the admin account.
 
 For all options: `schedule-containers --help`
 
