@@ -39,6 +39,7 @@
             <a href="/tags" class="nav-link{{if eq .Title "Tags"}} active{{end}}">Tags</a>
             <a href="/containers" class="nav-link{{if eq .Title "Containers"}} active{{end}}">Containers</a>
             <a href="/presets" class="nav-link{{if eq .Title "Presets"}} active{{end}}">Presets</a>
+            <a href="/log-rules" class="nav-link{{if eq .Title "Log Rules"}} active{{end}}">Log Rules</a>
             {{if and .CurrentUser (eq (print .CurrentUser.Role) "admin")}}
             <a href="/admin/users" class="nav-link{{if eq .Title "Users"}} active{{end}}">Users</a>
             {{end}}

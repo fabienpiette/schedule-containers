@@ -115,6 +115,13 @@ type TagsData struct {
 	ContainerStates map[string]string
 }
 
+type LogRulesData struct {
+	PageBase
+	Title      string
+	Rules      []models.LogRule
+	Containers []string
+}
+
 func buildTagCache(tags []models.Tag) map[string]string {
 	cache := make(map[string]string, len(tags))
 	for _, tag := range tags {
@@ -510,5 +517,28 @@ func (s *Server) handleWakeStackStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"healthy": result.Healthy,
 		"url":     result.OnDemandURL,
+	})
+}
+
+// handleLogRules renders the log-restart-rules page.
+func (s *Server) handleLogRules(w http.ResponseWriter, r *http.Request) {
+	rules, err := s.store.ListLogRules(r.Context())
+	if err != nil {
+		http.Error(w, "failed to list log rules", http.StatusInternalServerError)
+		return
+	}
+	containers, _ := s.docker.ListContainers(r.Context())
+
+	containerNames := make([]string, len(containers))
+	for i, c := range containers {
+		containerNames[i] = c.Name
+	}
+	slices.Sort(containerNames)
+
+	s.renderPage(w, "log_rules.html", LogRulesData{
+		PageBase:   PageBase{CurrentUser: UserFromContext(r.Context())},
+		Title:      "Log Rules",
+		Rules:      rules,
+		Containers: containerNames,
 	})
 }

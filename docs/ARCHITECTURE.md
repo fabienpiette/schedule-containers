@@ -5,7 +5,7 @@ If you want to familiarize yourself with the codebase, you are in the right plac
 
 ## Bird's Eye View
 
-Schedule Containers is a single Go binary that keeps Docker containers running on a schedule. You define cron expressions for when a container should start and stop, and the scheduler ensures those actions happen at the right time. Stacks let you schedule groups of containers (Docker Compose stacks) together with a single cron pair. Tags let you define a schedule template and apply it to multiple containers at once. On-demand wake lets stopped containers be started via a URL and automatically stopped after inactivity. Role-based authentication (reader, writer, admin) protects all management endpoints; OIDC login via Pocket ID or any OpenID Connect provider works alongside local passwords. A web dashboard and REST API provide runtime management; a CLI handles offline operations and YAML import/export.
+Schedule Containers is a single Go binary that keeps Docker containers running on a schedule. You define cron expressions for when a container should start and stop, and the scheduler ensures those actions happen at the right time. Stacks let you schedule groups of containers (Docker Compose stacks) together with a single cron pair. Tags let you define a schedule template and apply it to multiple containers at once. On-demand wake lets stopped containers be started via a URL and automatically stopped after inactivity. Log rules watch a running container's logs and restart it when a line matches a substring or regex pattern, with per-rule cooldown and a circuit breaker that auto-disables runaway rules. Role-based authentication (reader, writer, admin) protects all management endpoints; OIDC login via Pocket ID or any OpenID Connect provider works alongside local passwords. A web dashboard and REST API provide runtime management; a CLI handles offline operations and YAML import/export.
 
 On startup, the `serve` command loads persisted schedules, stacks, and tags from SQLite, registers them with an in-process cron runner, starts the on-demand manager, and starts an HTTP server. If OIDC is configured, the login page shows a Pocket ID button alongside local password auth. If no users exist, all requests redirect to `/setup` to create the initial admin account. After setup, all management endpoints require session-based authentication with role checks. When a cron job fires, the scheduler calls the Docker API to start or stop the target container (or all containers in a stack). When a user accesses `/wake/<container>/`, the on-demand manager starts the container and redirects to the configured URL once healthy.
 
@@ -41,15 +41,15 @@ On startup, the `serve` command loads persisted schedules, stacks, and tags from
                 └─────────────────┘
 ```
 
-The auth layer sits inside `web/` as middleware — `requireRole` and `firstRunRedirect` wrap HTTP handlers. Session tokens are stored in SQLite alongside users. OIDC flow adds `/auth/oidc/login` and `/auth/oidc/callback` as public routes.
+The `ondemand/` and `logwatch/` managers run alongside `scheduler/`, each owning their own goroutines (idle trackers and per-container log watchers respectively) and driven off the Docker client. The auth layer sits inside `web/` as middleware — `requireRole` and `firstRunRedirect` wrap HTTP handlers. Session tokens are stored in SQLite alongside users. OIDC flow adds `/auth/oidc/login` and `/auth/oidc/callback` as public routes.
 
 ## Code Map
 
 ### `internal/models/`
 
-Pure data types: `Schedule`, `Stack`, `Container`, `CronPreset`, `Tag`, `User`, `Session`, and `Role`. No logic, no dependencies. Every other package imports this one. The `Role` type defines `reader`, `writer`, and `admin` with an `AtLeast` method for permission checks.
+Pure data types: `Schedule`, `Stack`, `Container`, `CronPreset`, `Tag`, `User`, `Session`, `Role`, and `LogRule`. Almost no logic — the exception is `LogRule`, which carries `Validate()` (compiles regex, rejects unknown match types), `Normalize()` (defaults an empty match type to substring), and `Cooldown()` (the single source of truth for the cooldown default). Every other package imports this one. The `Role` type defines `reader`, `writer`, and `admin` with an `AtLeast` method for permission checks.
 
-Key files: `schedule.go`, `stack.go`, `user.go`
+Key files: `schedule.go`, `stack.go`, `user.go`, `log_rule.go`
 
 ### `internal/config/`
 
@@ -65,7 +65,7 @@ Key files: `auth.go`
 
 ### `internal/store/`
 
-SQLite persistence for schedules, stacks, tags, users, and sessions. Uses `modernc.org/sqlite` (pure Go, no CGO). `Open` runs versioned migrations on startup. CRUD operations cover schedules, stacks, tags, and user/session management. `DeleteTag` cascades to all schedules with the matching `tag_id`. A unique index on `(tag_id, container_name)` prevents duplicate schedules for the same tag+container. Sessions include expiry and are cleaned up on startup.
+SQLite persistence for schedules, stacks, tags, users, sessions, and log rules. Uses `modernc.org/sqlite` (pure Go, no CGO). `Open` runs versioned migrations on startup (latest is v6, the `log_rules` table). CRUD operations cover schedules, stacks, tags, user/session management, and log rules. `DeleteTag` cascades to all schedules with the matching `tag_id`. A unique index on `(tag_id, container_name)` prevents duplicate schedules for the same tag+container. Sessions include expiry and are cleaned up on startup.
 
 Key files: `store.go`
 
@@ -79,9 +79,9 @@ Key files: `presets.go`, `presets.yaml`
 
 ### `internal/docker/`
 
-Docker SDK wrapper. `NewClient` takes a Docker host string and returns a `*Client` with container management operations: `ListContainers`, `StartContainer`, `StopContainer`, `IsRunning`, `GetContainer`. `InspectContainer` returns health status and exposed ports. `ContainerStats` returns a `<-chan StatsSnapshot` stream for idle monitoring.
+Docker SDK wrapper. `NewClient` takes a Docker host string and returns a `*Client` with container management operations: `ListContainers`, `StartContainer`, `StopContainer`, `IsRunning`, `GetContainer`. `InspectContainer` returns health status and exposed ports. `ContainerStats` returns a `<-chan StatsSnapshot` stream for idle monitoring. `FollowLogs` returns a `<-chan string` line stream (stdcopy-demuxed, bounded line length) for log-rule matching, and `RestartContainer` performs a graceful restart.
 
-Key files: `client.go`, `stats.go`
+Key files: `client.go`, `stats.go`, `logs.go`
 
 **Architecture Invariant:** The `Client` type methods match the `scheduler.DockerActionClient` interface exactly. The `OnDemandDockerClient` interface in `ondemand` extends it with inspection and stats methods.
 
@@ -101,6 +101,14 @@ Key files: `ondemand.go`, `idle.go`
 
 **Architecture Invariant:** On-demand works independently of cron scheduling. A schedule with `Enabled=false, OnDemandEnabled=true` has no cron start/stop but still has a wake URL and idle monitor. The ondemand package holds its own per-container mutex map for wake serialization, separate from the scheduler's.
 
+### `internal/logwatch/`
+
+Log-based container restarts. `Manager` runs one goroutine and one Docker log stream per *container* that has at least one enabled log rule — not one per rule. Each incoming log line is evaluated against that container's compiled matchers (substring or regex). On a match, the matcher's rule triggers a restart, gated by a per-rule cooldown (no repeat restarts within the configured window) and a per-rule circuit breaker that auto-disables a rule after too many restarts in a short window, preventing restart loops. The web layer live-updates watched containers and rules through the `LogWatchService` interface (`AddRule`/`UpdateRule`/`RemoveRule`) rather than restarting the manager.
+
+Key files: `matcher.go`, `watcher.go`, `manager.go`
+
+**Architecture Invariant:** `logwatch` depends only on `docker`, `store`, and `models` — it does not import `scheduler`, `ondemand`, or `web`.
+
 ### `internal/yamlconfig/`
 
 YAML import/export for schedules and tags. `FromSchedulesAndTags` serializes schedules and tags to YAML bytes, grouping tag-derived schedules under their tag. `ToSchedulesAndTags` parses YAML into schedule and tag models.
@@ -113,13 +121,13 @@ HTTP server, REST API, and HTML dashboard (Go templates + HTMX). Routes serve bo
 
 Key files: `server.go`, `api.go`, `handlers.go`
 
-**Architecture Invariant:** The web layer depends on `SchedulerService`, `OnDemandService`, and `StackOnDemandService` interfaces, not concrete types.
+**Architecture Invariant:** The web layer depends on `SchedulerService`, `OnDemandService`, `StackOnDemandService`, and `LogWatchService` interfaces, not concrete types. Compile-time checks in `server.go` assert each concrete manager satisfies its interface.
 
 ### `internal/cli/`
 
-CLI commands backed by Cobra. `serve.go` is the composition root — it wires together the store, Docker client, scheduler, on-demand manager, preset service, and web server. `schedule.go` and `tag.go` are thin wrappers over the store for offline operations.
+CLI commands backed by Cobra. `serve.go` is the composition root — it wires together the store, Docker client, scheduler, on-demand manager, log-watch manager, preset service, and web server. `schedule.go`, `tag.go`, and `logrule.go` are thin wrappers over the store for offline operations.
 
-Key files: `serve.go`, `schedule.go`, `tag.go`
+Key files: `serve.go`, `schedule.go`, `tag.go`, `logrule.go`
 
 **Architecture Invariant:** CLI commands outside `serve` only touch the store directly — they do not interact with the scheduler or on-demand manager. Changes take effect on next `serve` restart.
 
@@ -129,7 +137,7 @@ Entry point. Minimal `main.go` that delegates to `internal/cli`.
 
 ## Invariants
 
-- **Dependency direction:** `models` ← `config` ← `auth`/`store`/`cronpresets` ← `docker` ← `scheduler`/`ondemand` ← `yamlconfig` ← `web`/`cli`. No cycles. `store`, `auth`, and `cronpresets` are leaves; they never import from scheduler, ondemand, web, or docker. `scheduler` depends on Docker via the `DockerActionClient` interface, not direct import.
+- **Dependency direction:** `models` ← `config` ← `auth`/`store`/`cronpresets` ← `docker` ← `scheduler`/`ondemand`/`logwatch` ← `yamlconfig` ← `web`/`cli`. No cycles. `store`, `auth`, and `cronpresets` are leaves; they never import from scheduler, ondemand, logwatch, web, or docker. `scheduler`, `ondemand`, and `logwatch` depend on Docker via their own minimal interfaces (`DockerActionClient`, `OnDemandDockerClient`, `logwatch.DockerClient`), not direct concrete use.
 - **Tags are linked to schedules via `tag_id`:** A nullable `tag_id` column on the `schedules` table links each schedule to its tag. Tag-derived schedules cannot have their cron expressions edited independently — update the tag instead. Deleting a tag cascades to all its schedules.
 - **Tags are persisted in SQLite** — not in YAML. Presets are in YAML; tags are user data in the DB.
 - **Store is offline-only for CLI:** CLI commands write directly to SQLite. Changes made while the server is running take effect on next restart.
@@ -137,6 +145,7 @@ Entry point. Minimal `main.go` that delegates to `internal/cli`.
 - **Cron format:** Always 5-field standard (`min hour day month weekday`), not 6-field with seconds.
 - **On-demand independence:** `OnDemandEnabled` works independently of `Enabled`. A schedule with `Enabled=false, OnDemandEnabled=true` has no cron start/stop but still has a wake URL and idle monitor. The `toggle` API endpoint only affects cron registration.
 - **OnDemandURL required when enabled:** When `OnDemandEnabled` is true, `OnDemandURL` must be a valid URL. The API validates this on create and update.
+- **One log watcher per container, not per rule:** `logwatch` runs a single goroutine and log stream per container that has ≥1 enabled rule, evaluating all that container's compiled matchers per line. A per-rule cooldown plus a per-rule circuit breaker (auto-disable after too many restarts in a window) prevent restart loops. Web mutations live-update the manager via `LogWatchService`; CLI writes to SQLite and take effect on next `serve` restart. In-memory cooldown/breaker state is not persisted (only the terminal auto-disable is) and resets when a container's watcher is rebuilt.
 - **Role-based access:** All management endpoints require authentication. Three roles — reader (read-only), writer (create/modify, no delete), admin (full access including user management). Wake URLs remain public. First run creates the initial admin account via `/setup`.
 - **No OIDC auto-linking:** OIDC users are matched by subject claim (`oidc_subject`) or auto-provisioned as `reader`. The system never links an OIDC identity to an existing local account by username — this prevents account takeover. Admins can manually link an OIDC account to a local account via the admin panel (`POST /admin/users/{id}/link-oidc`), which transfers the `oidc_subject`, deletes the OIDC account, and invalidates both users' sessions.
 - **Single binary:** Templates, static assets, and default presets are embedded via `//go:embed`. No external files needed at runtime except the SQLite database, optional presets YAML override, and Docker socket.
@@ -146,10 +155,10 @@ Entry point. Minimal `main.go` that delegates to `internal/cli`.
 - **Error handling:** Errors are logged with `slog` and returned to the caller. The scheduler and idle monitor log and continue on container start/stop failures — no retries, since the cron job will fire again or the idle tracker will re-register on the next wake.
 - **Logging:** Structured text via `log/slog`. Levels: `DEBUG` (container discovery), `INFO` (schedule fires, container wake), `WARN` (missing containers, invalid cron), `ERROR` (Docker API failures). Configured via `LOG_LEVEL` env var, default `info`.
 - **Configuration:** All via environment variables with defaults. No config files. See `internal/config/config.go`.
-- **Testing:** Unit tests with mocked dependencies. The `OnDemandDockerClient`, `OnDemandService`, and `StackOnDemandService` interfaces allow testing wake, idle, and stack logic with mocks. Docker client uses a transformation function (`transformContainers`) that's unit-testable without a Docker daemon. Web handlers tested with `httptest`.
-- **Concurrency:** The scheduler serializes cron actions per container using `sync.Mutex`. The on-demand manager serializes wake requests per container using a separate mutex map. The idle monitor spawns a goroutine per tracked container that streams Docker Stats and checks idle thresholds on a 5-second interval. The store uses SQLite's built-in serialization for concurrent reads/writes.
+- **Testing:** Unit tests with mocked dependencies. The `OnDemandDockerClient`, `OnDemandService`, and `StackOnDemandService` interfaces allow testing wake, idle, and stack logic with mocks. Docker client uses a transformation function (`transformContainers`) that's unit-testable without a Docker daemon. The `logwatch.DockerClient` and `RuleStore` interfaces plus an injectable clock let the watcher and manager be tested — cooldown, circuit breaker, stop-and-reattach — under `-race` without a Docker daemon. Web handlers tested with `httptest`, including the log-rule JSON/HTML dual-mode branch.
+- **Concurrency:** The scheduler serializes cron actions per container using `sync.Mutex`. The on-demand manager serializes wake requests per container using a separate mutex map. The idle monitor spawns a goroutine per tracked container that streams Docker Stats and checks idle thresholds on a 5-second interval. The log-watch manager spawns one goroutine per watched container that streams Docker logs and matches each line, mutating its watcher set under a manager-level mutex; circuit-breaker-triggered disables and watcher teardowns run off the watcher goroutine to avoid self-deadlock. The store uses SQLite's built-in serialization for concurrent reads/writes.
 - **Authentication:** Session tokens stored in SQLite, set as `HttpOnly` + `Secure` cookies. Passwords hashed with bcrypt. OIDC login uses PKCE with short-lived state cookies. Role checks are middleware — `requireRole(RoleReader)`, `requireRole(RoleWriter)`, `requireRole(RoleAdmin)`. `firstRunRedirect` middleware redirects to `/setup` when no users exist.
-- **Database migrations:** Run automatically on startup in `store.Open()`. A `schema_version` table tracks the version. New columns are added via migration steps — never edit existing steps.
+- **Database migrations:** Run automatically on startup in `store.Open()`. A `schema_version` table tracks the version (currently v6). New tables and columns are added via new `if version < N` steps — never edit existing steps.
 
 ## A Typical Change
 

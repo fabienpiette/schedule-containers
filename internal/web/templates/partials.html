@@ -118,6 +118,33 @@
 {{end}}
 {{end}}
 
+{{define "log-rule-row"}}
+<tr class="data-row" id="log-rule-{{.ID}}">
+    <td class="cell-name">{{.ContainerName}}</td>
+    <td><code>{{.Pattern}}</code></td>
+    <td class="muted">{{.MatchType}}</td>
+    <td>{{.CooldownSec}}s</td>
+    <td class="muted">{{if .LastMatchedAt}}{{.LastMatchedAt.Format "2006-01-02 15:04:05"}}{{else}}Never{{end}}</td>
+    <td>
+        {{if .Enabled}}<span class="status-pill status-on"><span class="status-dot"></span>Enabled</span>
+        {{else}}<span class="status-pill status-off"><span class="status-dot"></span>Disabled</span>{{end}}
+        {{if .DisabledReason}}<span class="badge badge-danger" title="Auto-disabled">auto-disabled: {{.DisabledReason}}</span>{{end}}
+    </td>
+    <td class="cell-actions">
+        <button class="act-btn" title="{{if .Enabled}}Disable{{else}}Enable{{end}}" onclick="toggleLogRule('{{.ID}}')">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+        <button class="act-btn act-danger" title="Delete" onclick="deleteLogRule('{{.ID}}','{{.ContainerName}}: {{.Pattern}}')">Delete</button>
+    </td>
+</tr>
+{{end}}
+
+{{define "log-rule-tbody"}}
+{{range .Rules}}
+{{template "log-rule-row" .}}
+{{else}}
+<tr><td colspan="7" class="empty-cell">No log rules configured. Create one to get started.</td></tr>
+{{end}}
+{{end}}
+
 {{define "stack-row"}}
 <tr class="data-row" id="stack-{{.ID}}">
     <td class="cell-name">

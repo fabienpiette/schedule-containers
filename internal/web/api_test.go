@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -45,8 +47,37 @@ func setupTestServer(t *testing.T) (*Server, *mockSchedulerService) {
 	cfg := &config.Config{WebHost: "127.0.0.1", WebPort: 0}
 
 	dockerClient, _ := docker.NewClient("unix:///var/run/docker.sock")
-	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, nil, nil)
+	srv := NewServer(cfg, db, dockerClient, mockSched, presetSvc, nil, nil, &spyLogWatch{})
 	return srv, mockSched
+}
+
+// spyLogWatch is a thread-safe LogWatchService test double that records
+// which rule IDs each method was called with, so tests can assert the
+// manager live-update invariant (create->AddRule, update->UpdateRule only,
+// toggle->AddRule/RemoveRule, delete->RemoveRule) instead of just trusting it.
+type spyLogWatch struct {
+	mu      sync.Mutex
+	added   []string // rule IDs passed to AddRule
+	updated []string // rule IDs passed to UpdateRule
+	removed []string // rule IDs passed to RemoveRule
+}
+
+func (s *spyLogWatch) AddRule(r models.LogRule) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.added = append(s.added, r.ID)
+}
+
+func (s *spyLogWatch) UpdateRule(r models.LogRule) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.updated = append(s.updated, r.ID)
+}
+
+func (s *spyLogWatch) RemoveRule(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.removed = append(s.removed, id)
 }
 
 type mockSchedulerService struct {
@@ -778,5 +809,185 @@ func TestAPIUpdateScheduleRejectsCronChangeForTagSchedule(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestAPICreateLogRule_ValidatesRegex(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	body := `{"container_name":"web","pattern":"([","match_type":"regex","enabled":true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/log-rules", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.apiCreateLogRule(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid regex, got %d", w.Code)
+	}
+}
+
+func TestAPICreateLogRule_Succeeds(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	body := `{"container_name":"web","pattern":"boom","match_type":"substring","enabled":true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/log-rules", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.apiCreateLogRule(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d (%s)", w.Code, w.Body.String())
+	}
+	rules, _ := srv.store.ListLogRules(context.Background())
+	if len(rules) != 1 || rules[0].ContainerName != "web" {
+		t.Fatalf("expected 1 rule for web, got %+v", rules)
+	}
+
+	spy := srv.logwatch.(*spyLogWatch)
+	if len(spy.added) != 1 || spy.added[0] != rules[0].ID {
+		t.Fatalf("expected AddRule called once with %s, got %+v", rules[0].ID, spy.added)
+	}
+	if len(spy.updated) != 0 {
+		t.Fatalf("expected UpdateRule not called, got %+v", spy.updated)
+	}
+	if len(spy.removed) != 0 {
+		t.Fatalf("expected RemoveRule not called, got %+v", spy.removed)
+	}
+}
+
+func TestAPIListLogRules_HTMLPartial(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	if _, err := srv.store.CreateLogRule(context.Background(), &models.LogRule{
+		ContainerName: "web", Pattern: "boom", MatchType: models.MatchSubstring, Enabled: true,
+	}); err != nil {
+		t.Fatalf("seed rule: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/log-rules", nil)
+	req.Header.Set("HX-Request", "true")
+	w := httptest.NewRecorder()
+	srv.apiListLogRules(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Fatalf("expected text/html content-type, got %q", ct)
+	}
+	body := strings.TrimSpace(w.Body.String())
+	if !strings.Contains(body, "web") || !strings.Contains(body, "boom") {
+		t.Fatalf("expected tbody partial with rule content, got: %s", body)
+	}
+	if strings.HasPrefix(body, "[") || strings.HasPrefix(body, "{") {
+		t.Fatalf("expected HTML partial, got JSON: %s", body)
+	}
+}
+
+func TestAPIUpdateLogRule_CallsUpdateRuleNotAddRule(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	created, err := srv.store.CreateLogRule(context.Background(), &models.LogRule{
+		ContainerName: "web",
+		Pattern:       "boom",
+		MatchType:     models.MatchSubstring,
+		Enabled:       true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spy := srv.logwatch.(*spyLogWatch)
+	spy.added = nil // discard any calls made outside this test's scope (none expected, but keep it isolated)
+
+	body := `{"container_name":"web","pattern":"crash","match_type":"substring","enabled":true}`
+	r := chi.NewRouter()
+	r.Put("/api/log-rules/{id}", srv.apiUpdateLogRule)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/log-rules/"+created.ID, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", w.Code, w.Body.String())
+	}
+	if len(spy.updated) != 1 || spy.updated[0] != created.ID {
+		t.Fatalf("expected UpdateRule called once with %s, got %+v", created.ID, spy.updated)
+	}
+	if len(spy.added) != 0 {
+		t.Fatalf("edit must never go through AddRule, got %+v", spy.added)
+	}
+}
+
+func TestAPIToggleLogRule_CallsAddOrRemove(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	created, err := srv.store.CreateLogRule(context.Background(), &models.LogRule{
+		ContainerName: "web",
+		Pattern:       "boom",
+		MatchType:     models.MatchSubstring,
+		Enabled:       true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spy := srv.logwatch.(*spyLogWatch)
+	spy.added = nil // ignore the AddRule call from creation above
+
+	r := chi.NewRouter()
+	r.Post("/api/log-rules/{id}/toggle", srv.apiToggleLogRule)
+
+	// First toggle: enabled -> disabled.
+	req := httptest.NewRequest(http.MethodPost, "/api/log-rules/"+created.ID+"/toggle", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", w.Code, w.Body.String())
+	}
+	if len(spy.removed) != 1 || spy.removed[0] != created.ID {
+		t.Fatalf("expected RemoveRule called once with %s after disabling, got %+v", created.ID, spy.removed)
+	}
+	if len(spy.added) != 0 {
+		t.Fatalf("expected AddRule not called when disabling, got %+v", spy.added)
+	}
+
+	// Second toggle: disabled -> enabled.
+	req = httptest.NewRequest(http.MethodPost, "/api/log-rules/"+created.ID+"/toggle", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", w.Code, w.Body.String())
+	}
+	if len(spy.added) != 1 || spy.added[0] != created.ID {
+		t.Fatalf("expected AddRule called once with %s after re-enabling, got %+v", created.ID, spy.added)
+	}
+}
+
+func TestAPIDeleteLogRule_CallsRemoveRule(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	created, err := srv.store.CreateLogRule(context.Background(), &models.LogRule{
+		ContainerName: "web",
+		Pattern:       "boom",
+		MatchType:     models.MatchSubstring,
+		Enabled:       true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spy := srv.logwatch.(*spyLogWatch)
+	spy.added = nil // ignore the AddRule call from creation above
+
+	r := chi.NewRouter()
+	r.Delete("/api/log-rules/{id}", srv.apiDeleteLogRule)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/log-rules/"+created.ID, nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d (%s)", w.Code, w.Body.String())
+	}
+	if len(spy.removed) != 1 || spy.removed[0] != created.ID {
+		t.Fatalf("expected RemoveRule called once with %s, got %+v", created.ID, spy.removed)
 	}
 }

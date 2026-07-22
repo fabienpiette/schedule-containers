@@ -13,6 +13,7 @@ import (
 	"github.com/fabienpiette/schedule-containers/internal/config"
 	"github.com/fabienpiette/schedule-containers/internal/cronpresets"
 	"github.com/fabienpiette/schedule-containers/internal/docker"
+	"github.com/fabienpiette/schedule-containers/internal/logwatch"
 	"github.com/fabienpiette/schedule-containers/internal/ondemand"
 	"github.com/fabienpiette/schedule-containers/internal/scheduler"
 	"github.com/fabienpiette/schedule-containers/internal/store"
@@ -93,13 +94,19 @@ var serveCmd = &cobra.Command{
 			}
 		}
 
+		lwm := logwatch.NewManager(dockerClient, db)
+		if err := lwm.Start(cmd.Context()); err != nil {
+			slog.Error("failed to start log-watch manager", "error", err)
+			os.Exit(1)
+		}
+
 		presetSvc, err := cronpresets.NewService(cfg.PresetsPath)
 		if err != nil {
 			slog.Error("failed to initialize preset service", "error", err)
 			os.Exit(1)
 		}
 
-		webSrv := web.NewServer(cfg, db, dockerClient, sched, presetSvc, odm, odm)
+		webSrv := web.NewServer(cfg, db, dockerClient, sched, presetSvc, odm, odm, lwm)
 		go func() {
 			if err := webSrv.Start(); err != nil {
 				slog.Error("web server error", "error", err)
@@ -112,6 +119,7 @@ var serveCmd = &cobra.Command{
 
 		slog.Info("shutting down")
 		odm.Stop()
+		lwm.Stop()
 		sched.Stop()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()

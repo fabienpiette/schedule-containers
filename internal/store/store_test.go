@@ -895,3 +895,119 @@ func TestLinkOIDCAccountErrors(t *testing.T) {
 		t.Error("expected error when source is last admin")
 	}
 }
+
+func TestLogRuleCRUD(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	r := &models.LogRule{
+		ContainerName: "web",
+		Pattern:       "OutOfMemory",
+		MatchType:     models.MatchSubstring,
+		Enabled:       true,
+		CooldownSec:   30,
+	}
+	created, err := s.CreateLogRule(ctx, r)
+	if err != nil {
+		t.Fatalf("CreateLogRule: %v", err)
+	}
+	if created.ID == "" {
+		t.Fatal("expected generated ID")
+	}
+
+	got, err := s.GetLogRule(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetLogRule: %v", err)
+	}
+	if got.Pattern != "OutOfMemory" || got.MatchType != models.MatchSubstring || got.CooldownSec != 30 {
+		t.Fatalf("unexpected rule: %+v", got)
+	}
+
+	// disable via breaker path
+	if err := s.SetLogRuleDisabled(ctx, created.ID, "circuit breaker"); err != nil {
+		t.Fatalf("SetLogRuleDisabled: %v", err)
+	}
+	got, _ = s.GetLogRule(ctx, created.ID)
+	if got.Enabled || got.DisabledReason == nil || *got.DisabledReason != "circuit breaker" {
+		t.Fatalf("expected disabled with reason, got %+v", got)
+	}
+
+	// enabled listing excludes disabled
+	enabled, err := s.ListEnabledLogRules(ctx)
+	if err != nil {
+		t.Fatalf("ListEnabledLogRules: %v", err)
+	}
+	if len(enabled) != 0 {
+		t.Fatalf("expected 0 enabled, got %d", len(enabled))
+	}
+
+	// toggle back on clears the reason
+	toggled, err := s.ToggleLogRule(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("ToggleLogRule: %v", err)
+	}
+	if !toggled.Enabled || toggled.DisabledReason != nil {
+		t.Fatalf("expected enabled with cleared reason, got %+v", toggled)
+	}
+
+	if err := s.DeleteLogRule(ctx, created.ID); err != nil {
+		t.Fatalf("DeleteLogRule: %v", err)
+	}
+	if _, err := s.GetLogRule(ctx, created.ID); err == nil {
+		t.Fatal("expected error getting deleted rule")
+	}
+}
+
+func TestLogRule_TouchAndDisable(t *testing.T) {
+	s := tempDB(t)
+	ctx := context.Background()
+
+	r := &models.LogRule{
+		ContainerName: "api",
+		Pattern:       "panic",
+		MatchType:     models.MatchSubstring,
+		Enabled:       true,
+		CooldownSec:   10,
+	}
+	created, err := s.CreateLogRule(ctx, r)
+	if err != nil {
+		t.Fatalf("CreateLogRule: %v", err)
+	}
+	if created.LastMatchedAt != nil {
+		t.Fatalf("expected nil LastMatchedAt on create, got %v", created.LastMatchedAt)
+	}
+
+	matchedAt := time.Now().UTC().Truncate(time.Second)
+	if err := s.TouchLogRuleMatched(ctx, created.ID, matchedAt); err != nil {
+		t.Fatalf("TouchLogRuleMatched: %v", err)
+	}
+
+	got, err := s.GetLogRule(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetLogRule: %v", err)
+	}
+	if got.LastMatchedAt == nil {
+		t.Fatal("expected non-nil LastMatchedAt after touch")
+	}
+	if !got.LastMatchedAt.Equal(matchedAt) {
+		t.Fatalf("LastMatchedAt = %v, want %v", got.LastMatchedAt, matchedAt)
+	}
+
+	if err := s.SetLogRuleDisabled(ctx, created.ID, "breaker tripped"); err != nil {
+		t.Fatalf("SetLogRuleDisabled: %v", err)
+	}
+	got, err = s.GetLogRule(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetLogRule after disable: %v", err)
+	}
+	if got.Enabled {
+		t.Fatal("expected rule to be disabled")
+	}
+	if got.DisabledReason == nil || *got.DisabledReason != "breaker tripped" {
+		t.Fatalf("expected disabled reason, got %+v", got.DisabledReason)
+	}
+	// LastMatchedAt should survive the disable.
+	if got.LastMatchedAt == nil || !got.LastMatchedAt.Equal(matchedAt) {
+		t.Fatalf("expected LastMatchedAt to persist across disable, got %v", got.LastMatchedAt)
+	}
+}
